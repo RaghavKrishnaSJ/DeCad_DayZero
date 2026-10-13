@@ -1,7 +1,7 @@
 <div align="center">
 
 # ⚡ DeCad (Schematic2SDN)
-### AI-Augmented EDA Workbench · Native KiCad Synthesis · Specctra DSN Routing Engine
+### The "Cursor for Hardware" · AI-Native Circuit IDE · Specctra DSN Routing Engine
 
 [![KiCad](https://img.shields.io/badge/KiCad-v9.0-2f3b82.svg?logo=kicad)](https://www.kicad.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker)](https://www.docker.com/)
@@ -11,12 +11,28 @@
 [![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 
 <p align="center">
-  <b>DeCad</b> is an enterprise-grade Electronics Design Automation (EDA) platform that unifies multimodal circuit ingestion (sketches, scanned PDFs, SPICE netlists, and NLP prompts) with deterministic <b>KiCad 9 s-expression synthesis</b>, real-time <b>Electrical Rules Checking (ERC)</b>, automated <b>Specctra DSN autorouting handoffs</b>, and full-fidelity <b>Bill of Materials (BOM) catalog sourcing</b>.
+  <b>DeCad is "Cursor for Circuits" — an agentic, AI-first Integrated Development Environment for hardware engineering.</b><br/>
+  Just as Cursor and Antigravity revolutionized software development through in-context pair programming and autonomous code synthesis, <b>DeCad brings agentic pair-engineering to physical electronics</b>: synthesizing native KiCad schematics, auto-routing via Specctra DSN, running simulation checks, and sourcing real components in real time.
 </p>
 
 ---
 
 </div>
+
+## 💡 The Paradigm: "Cursor for Circuits"
+
+For decades, software development had modern IDEs with autocomplete, linting, and AI pair-programmers, while **hardware designers remained trapped in manual, point-and-click graphical EDA suites from the 1990s**.
+
+| Software Engineering (Cursor / Antigravity) | Hardware Engineering with **DeCad** |
+| :--- | :--- |
+| **Natural Language to Code**: Type what you want, AI generates functions | **Natural Language to Schematic**: Type *"Add buck converter with 3.3V out"*, DeCad generates symbols & wiring |
+| **Multimodal Inputs**: Screenshot a Figma UI $\to$ React Component | **Multimodal Ingestion**: Photo of a whiteboard sketch $\to$ Native KiCad schematic |
+| **Real-time Linting**: Red squiggles on syntax errors | **Real-time ERC**: Live KiCad Electrical Rules Check flags floating pins & shorted rails |
+| **Package Managers**: `npm install` or `pip install` | **Automated Component Sourcing**: Auto-maps exact LCSC/JLCPCB part numbers, ₹ pricing & stock |
+| **Compilers & Build Tools**: Webpack, GCC, Vite | **Native EDA Compilers**: KiCad S-Expression synthesis + Specctra DSN autorouter output |
+| **Git Version Control**: Clean diffs and GitHub synchronization | **EDA Git Sync**: Semantic commit histories and direct repository synchronization |
+
+---
 
 ## 📌 Architectural Overview
 
