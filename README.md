@@ -1,7 +1,7 @@
 <div align="center">
 
-# ⚡ DeCad (Schematic2SDN)
-### The "Cursor for Hardware" · AI-Native Circuit IDE · Specctra DSN Routing Engine
+# DeCad
+### The "Cursor for Hardware" &middot; AI-Native Circuit IDE &middot; Specctra DSN Routing Engine
 
 [![KiCad](https://img.shields.io/badge/KiCad-v9.0-2f3b82.svg?logo=kicad)](https://www.kicad.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker)](https://www.docker.com/)
@@ -11,30 +11,30 @@
 [![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 
 <p align="center">
-  <b>DeCad is "Cursor for Circuits" — an agentic, AI-first Integrated Development Environment for hardware engineering.</b><br/>
-  Just as Cursor and Antigravity revolutionized software development through in-context pair programming and autonomous code synthesis, <b>DeCad brings agentic pair-engineering to physical electronics</b>: synthesizing native KiCad schematics, auto-routing via Specctra DSN, running simulation checks, and sourcing real components in real time.
+  <b>DeCad is "Cursor for Circuits" &mdash; an agentic, AI-first Integrated Development Environment for hardware engineering.</b><br/>
+  Just as Cursor and Antigravity modernized software development through in-context pair programming and autonomous code synthesis, <b>DeCad brings agentic pair-engineering to physical electronics</b>: synthesizing native KiCad schematics, auto-routing via Specctra DSN, running simulation checks, and sourcing real components in real time.
 </p>
 
 ---
 
 </div>
 
-## 💡 The Paradigm: "Cursor for Circuits"
+## The Paradigm: "Cursor for Circuits"
 
 For decades, software development had modern IDEs with autocomplete, linting, and AI pair-programmers, while **hardware designers remained trapped in manual, point-and-click graphical EDA suites from the 1990s**.
 
 | Software Engineering (Cursor / Antigravity) | Hardware Engineering with **DeCad** |
 | :--- | :--- |
 | **Natural Language to Code**: Type what you want, AI generates functions | **Natural Language to Schematic**: Type *"Add buck converter with 3.3V out"*, DeCad generates symbols & wiring |
-| **Multimodal Inputs**: Screenshot a Figma UI $\to$ React Component | **Multimodal Ingestion**: Photo of a whiteboard sketch $\to$ Native KiCad schematic |
+| **Multimodal Inputs**: Screenshot a Figma UI &rarr; React Component | **Multimodal Ingestion**: Photo of a whiteboard sketch &rarr; Native KiCad schematic |
 | **Real-time Linting**: Red squiggles on syntax errors | **Real-time ERC**: Live KiCad Electrical Rules Check flags floating pins & shorted rails |
-| **Package Managers**: `npm install` or `pip install` | **Automated Component Sourcing**: Auto-maps exact LCSC/JLCPCB part numbers, ₹ pricing & stock |
+| **Package Managers**: `npm install` or `pip install` | **Automated Component Sourcing**: Auto-maps exact LCSC/JLCPCB part numbers, INR pricing & stock |
 | **Compilers & Build Tools**: Webpack, GCC, Vite | **Native EDA Compilers**: KiCad S-Expression synthesis + Specctra DSN autorouter output |
 | **Git Version Control**: Clean diffs and GitHub synchronization | **EDA Git Sync**: Semantic commit histories and direct repository synchronization |
 
 ---
 
-## 📌 Architectural Overview
+## Architectural Overview
 
 Traditional circuit engineering suffers from severe fragmentation: schematic capture, netlist generation, simulation, routing, and component procurement occur in disparate, incompatible tools. **DeCad solves this by providing a unified pipeline from initial multimodal concept to DRC-clean PCB fabrication files.**
 
@@ -60,7 +60,7 @@ flowchart TD
         F --> G1["KiCad Schematic (.kicad_sch)"]
         F --> G2["KiCad PCB (.kicad_pcb)"]
         F --> G3["Specctra DSN Autorouter (.dsn)"]
-        F --> G4["LCSC / JLCPCB BOM (₹ Pricing & Stock)"]
+        F --> G4["LCSC / JLCPCB BOM (Pricing & Stock)"]
         F --> G5["Ngspice Interactive Waveform Scope"]
         F --> G6["Git Revision Sync (Private GitHub Repo)"]
     end
@@ -72,7 +72,7 @@ flowchart TD
 
 ---
 
-## 🔬 How Complex EDA Workflows Are Simplified
+## How Complex EDA Workflows Are Simplified
 
 ### 1. Optical Schematic to Clean Netlists (Eliminating OCR Hallucinations)
 - **The Challenge**: Standard Computer Vision or Large Multimodal Models (LMMs) hallucinate connections, blend intersecting wires, and misread component subscripts.
@@ -110,7 +110,7 @@ sequenceDiagram
 
 ---
 
-## ⚡ Key Capabilities & Feature Matrix
+## Key Capabilities & Feature Matrix
 
 | Feature | DeCad Implementation | Industry Standard / Competitors |
 | :--- | :--- | :--- |
@@ -124,32 +124,32 @@ sequenceDiagram
 
 ---
 
-## 🖥️ Workbench Interface Map
+## Workbench Interface Map
 
-```
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│  DeCad WORKBENCH   Test1 / rev 6c9eb70   [Theme: Forge ▾]   ● KiCad ready  ● CPU ready  │
-├───────────────┬────────────────────────────────────────────────────────┬───────────────┤
-│  PROJECTS     │  [Schematic] [Source] [BOM (26)] [Nets] [Checks] [Scope] │  AI ASSISTANT │
-│  ▸ Test1      ├────────────────────────────────────────────────────────┤  "Add 10k R1" │
-│  ▸ Demo       │                                                        │  [Attachment] │
-│               │             KICAD VECTOR SCHEMATIC CANVAS              │               │
-│  FILES        │                                                        │  Uploaded:    │
-│  • board.sch  │                  [U1: 74LS240 Buffer]                  │  [Image Card] │
-│  • board.pcb  │                         │                              │  (Double-click│
-│  • board.dsn  │                    (Net: DATA_0)                       │   to zoom)    │
-│               │                         │                              │               │
-│  LIBRARIES    │                  [R1: 10k Resistor]                    │  [Apply Net]  │
-│  • Import Doc │                                                        │               │
-└───────────────┴────────────────────────────────────────────────────────┴───────────────┘
+```text
++----------------------------------------------------------------------------------------+
+|  DeCad WORKBENCH   Test1 / rev 6c9eb70   [Theme: Forge v]   o KiCad ready  o CPU ready  |
++---------------+--------------------------------------------------------+---------------+
+|  PROJECTS     |  [Schematic] [Source] [BOM (26)] [Nets] [Checks] [Scope] |  AI ASSISTANT |
+|  > Test1      +--------------------------------------------------------+  "Add 10k R1" |
+|  > Demo       |                                                        |  [Attachment] |
+|               |             KICAD VECTOR SCHEMATIC CANVAS              |               |
+|  FILES        |                                                        |  Uploaded:    |
+|  * board.sch  |                  [U1: 74LS240 Buffer]                  |  [Image Card] |
+|  * board.pcb  |                         |                              |  (Double-click|
+|  * board.dsn  |                    (Net: DATA_0)                       |   to zoom)    |
+|               |                         |                              |               |
+|  LIBRARIES    |                  [R1: 10k Resistor]                    |  [Apply Net]  |
+|  * Import Doc |                                                        |               |
++---------------+--------------------------------------------------------+---------------+
 ```
 
 ---
 
-## 🚀 Quickstart & Installation
+## Quickstart & Installation
 
 ### Prerequisites
-- [Docker Desktop](https://www.docker.com/) (allocated with $\ge 4\text{ GB}$ RAM)
+- [Docker Desktop](https://www.docker.com/) (allocated with at least 4 GB RAM)
 - Git command line tools
 
 ### Launch in 2 Steps
@@ -169,7 +169,7 @@ Access the application in your browser:
 
 ---
 
-## 📦 Directory Structure
+## Directory Structure
 
 ```text
 DeCad/
@@ -188,7 +188,7 @@ DeCad/
 ├── checkpoints/
 │   └── circuit-lora/adapter/  # Qwen2.5-VL 4-bit LoRA adapter weights
 ├── training/
-│   ├── Train_Schematic2SDN_Colab.ipynb  # GPU fine-tuning notebook
+│   ├── Train_DeCad_Colab.ipynb  # GPU fine-tuning notebook
 │   ├── finetune.py            # CUDA LoRA training pipeline
 │   └── evaluate.py            # Test split benchmark evaluator
 ├── libraries/                 # 46k+ KiCad symbols and SQLite database
@@ -198,7 +198,7 @@ DeCad/
 
 ---
 
-## 📄 License & Attribution
+## License & Attribution
 
 Developed by **Raghav Krishna ([@JRK14](https://github.com/JRK14))**. All rights reserved.
 Built on top of KiCad EDA, Ngspice, and Qwen Vision Architecture.
