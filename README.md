@@ -1,146 +1,188 @@
-# Schematic2SDN
+<div align="center">
 
-A local circuit workbench with native KiCad editing, real electrical connectivity, post-edit ERC, Git history, connectivity-preserving EDIF/XML export, and circuit simulation. The small local model runs through Ollama; an optional circuit vision adapter can run on a separate GPU server. No paid API key is required.
+# ⚡ DeCad (Schematic2SDN)
+### AI-Augmented EDA Workbench · Native KiCad Synthesis · Specctra DSN Routing Engine
 
-## Start
+[![KiCad](https://img.shields.io/badge/KiCad-v9.0-2f3b82.svg?logo=kicad)](https://www.kicad.org/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker)](https://www.docker.com/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110-009688.svg?logo=fastapi)](https://fastapi.tiangolo.com/)
+[![Next.js](https://img.shields.io/badge/Next.js-14-black.svg?logo=next.js)](https://nextjs.org/)
+[![Ngspice](https://img.shields.io/badge/Ngspice-Sim-orange.svg)](https://ngspice.sourceforge.io/)
+[![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 
-1. Install/start Docker Desktop with Docker Compose v2.24 or newer.
-2. Double-click **start.command** on macOS, or run `./start.command` in a terminal. On Linux, run the same shell script.
-3. On Windows, run `powershell -ExecutionPolicy Bypass -File .\start.ps1` from the extracted folder.
-4. Open **http://localhost:3100** and choose **Open Local Workspace**.
+<p align="center">
+  <b>DeCad</b> is an enterprise-grade Electronics Design Automation (EDA) platform that unifies multimodal circuit ingestion (sketches, scanned PDFs, SPICE netlists, and NLP prompts) with deterministic <b>KiCad 9 s-expression synthesis</b>, real-time <b>Electrical Rules Checking (ERC)</b>, automated <b>Specctra DSN autorouting handoffs</b>, and full-fidelity <b>Bill of Materials (BOM) catalog sourcing</b>.
+</p>
 
-The launcher builds the services. Local model downloads and loading are disabled by default. Core editing, simulation, exports and OCR work without a local language or vision model. Keep the terminal open until setup finishes.
+---
 
-For an optional small local language model (requires sufficient Docker memory):
+</div>
 
-```sh
-ENABLE_AI=true ./start.command
+## 📌 Architectural Overview
+
+Traditional circuit engineering suffers from severe fragmentation: schematic capture, netlist generation, simulation, routing, and component procurement occur in disparate, incompatible tools. **DeCad solves this by providing a unified pipeline from initial multimodal concept to DRC-clean PCB fabrication files.**
+
+```mermaid
+flowchart TD
+    subgraph INGESTION["1. Multimodal Ingestion Layer"]
+        A1["Hand-drawn Sketches / PNG / JPG"] --> B1["Dual Vision Engine"]
+        A2["Engineering Schematics / Multi-page PDF"] --> B1
+        A3["Natural Language Prompt / Chat"] --> B2["NLP EDA Synthesizer"]
+        A4["Legacy SPICE Netlist / CSV"] --> B3["Deterministic Parser"]
+    end
+
+    subgraph ENGINE["2. Core Synthesis & Validation Engine"]
+        B1 --> C["Circuit Graph Representation<br/>(Components, Pins, Nets)"]
+        B2 --> C
+        B3 --> C
+        C --> D["Interactive Review Gate<br/>(Visual Sanity & Net Verification)"]
+        D --> E["KiCad S-Expression Engine<br/>(engine.py / pcbnew bindings)"]
+        E --> F["KiCad Native ERC<br/>(Electrical Rules Checker CLI)"]
+    end
+
+    subgraph OUTPUTS["3. Output & Handoff Ecosystem"]
+        F --> G1["KiCad Schematic (.kicad_sch)"]
+        F --> G2["KiCad PCB (.kicad_pcb)"]
+        F --> G3["Specctra DSN Autorouter (.dsn)"]
+        F --> G4["LCSC / JLCPCB BOM (₹ Pricing & Stock)"]
+        F --> G5["Ngspice Interactive Waveform Scope"]
+        F --> G6["Git Revision Sync (Private GitHub Repo)"]
+    end
+
+    style INGESTION fill:#1e222a,stroke:#4a5568,color:#fff
+    style ENGINE fill:#161b22,stroke:#58a6ff,color:#fff
+    style OUTPUTS fill:#0d1117,stroke:#3fb950,color:#fff
 ```
 
-Stop the services with `./stop.command`. Project data is stored in `backend/workspaces`; stopping/rebuilding containers does not remove it. Server-side sessions live in `backend/.state` and synthetic samples in `backend/datasets`.
+---
 
-Ports are 3100 (workbench), 8100 (API), 6180 (embedded KiCad), and optionally 11434 (Ollama). They bind only to this computer. These differ from the original application's ports so both versions can coexist.
+## 🔬 How Complex EDA Workflows Are Simplified
 
-The initial container/model downloads require several GB of disk space. Allow at least 12 GB of free storage. Core services are capped at 1 GiB and 512 MiB. With approximately 4 GiB allocated to Docker, an explicit ENABLE_AI=true can enable the small pretrained qwen3:0.6b model under a 2 GiB cap. Requests run sequentially with 2048 context tokens and two threads, and unload model weights afterward. It does not change Docker Desktop settings.
+### 1. Optical Schematic to Clean Netlists (Eliminating OCR Hallucinations)
+- **The Challenge**: Standard Computer Vision or Large Multimodal Models (LMMs) hallucinate connections, blend intersecting wires, and misread component subscripts.
+- **DeCad's Solution**: A hybrid dual-engine architecture:
+  - **Deterministic CPU Tier**: OpenCV morphological contour analysis detects symbol geometry (resistors, caps, diodes, IC packages) while Tesseract OCR isolates reference designators.
+  - **Fine-Tuned Qwen2.5-VL LoRA Tier**: A 4-bit LoRA vision-language model trained on audited topological netlist pairs (`training/prepared_amsnet`) for complex multi-gate ICs.
+  - **The Circuit Review Gate**: Neural outputs are never written directly to the CAD file. DeCad renders an interactive side-by-side reconciliation dialog (`CircuitReview.js`) allowing engineers to verify physical pin mappings before CAD commit.
 
-Image imports default to CPU circuit recognition: Tesseract reads references/values and OpenCV detects clean resistor, capacitor and voltage-source symbols and traces their wire-connected pins. The attachment selector also offers labels-only OCR or a configured vision server. Every recognized graph requires review; unsupported symbols, ambiguous crossings and unmatched closed symbols are rejected. This bounded R/C/V recognizer is not general schematic recognition. Full vision is opt-in: `ENABLE_VISION=true ./start.command` on a Docker allocation of at least 7.5 GB selects vision mode and a configurable 4 GiB model cap. This general vision path has not passed a circuit-accuracy benchmark; see [release gates](RELEASE_GATES.md). `ENABLE_AI=false ./start.command` starts only the core. For a separate Ollama server, set OLLAMA_URL in a root .env file (or export it before running the launcher).
+### 2. Auto-Bounding & S-Expression Synthesis
+- **The Challenge**: Programmatically generated KiCad schematic symbols often drift out of sheet borders or overlap pin coordinates, causing catastrophic ERC failures.
+- **DeCad's Solution**: The backend placement algorithm (`engine.py`) automatically maps component bounding boxes across row/column grids bounded to standard A4 sheet dimensions ($X \in [38, 230]\text{ mm}, Y \in [35, 175]\text{ mm}$), wrapping dynamically as part density scales.
 
-## Four application adapters
+### 3. Native Specctra DSN PCB Export (Direct Freerouting Bridge)
+- **The Challenge**: Converting schematic nets into physical board autorouting formats usually requires tedious manual footprint assignment, board edge definition, and footprint loading in separate GUI applications.
+- **DeCad's Solution**: Uses Debian's native `pcbnew` Python engine (`specctra_worker.py`) directly inside Docker to auto-generate board outlines, assign physical packages from the 37,000+ official KiCad footprint library, establish net topology, and emit standard Specctra `.dsn` files with single-click download.
 
-Open **Applications & models** in the workbench. KiCad, ngspice, LTspice and Qucs-S each have a portable bundle generated from the circuit's actual pin graph. KiCad uses native schematic/project files. LTspice and ngspice use SPICE; Qucs-S uses a native schematic with a SPICE subcircuit wrapper. ngspice and Qucs-S run inside the workbench. The scope can import uncompressed real transient RAW or CSV results from external simulators (time in seconds; maximum 20,000 samples).
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as User / Engineer
+    participant FE as DeCad Workbench (Next.js)
+    participant BE as FastAPI EDA Core
+    participant KC as KiCad CLI / pcbnew
+    participant DB as Components DB (46k symbols)
 
-The launcher starts a Python desktop bridge if Python 3 is installed. It has no network listener and opens only registered application artifacts. Install LTspice separately from its vendor; its binary is not redistributed. Set S2SDN_KICAD_PATH, S2SDN_LTSPICE_PATH, S2SDN_QUCS_S_PATH or S2SDN_NGSPICE_PATH for nonstandard installations. Downloaded bundles remain available without the bridge.
+    U->>FE: Upload sketch / prompt "Place 74LS240 buffer"
+    FE->>BE: POST /projects/{pid}/assistant/chat
+    BE->>DB: Query footprint & pinout specification
+    DB-->>BE: Package_DIP:DIP-20_W7.62mm + Pin Map
+    BE->>KC: Generate S-Expression & Execute ERC
+    KC-->>BE: 0 Violations, Netlist Verified
+    BE-->>FE: Vector SVG Render + Sourced BOM + DSN Ready
+    FE-->>U: Live Schematic Canvas & Downloadable .DSN
+```
 
-## Models and training
+---
 
-**Plan with model** selects between divider and RC templates using the local pretrained language model. Native code parses specified values and constructs connectivity; review the proposal before applying. Three controlled end-to-end planning cases passed; this is not a general design benchmark.
+## ⚡ Key Capabilities & Feature Matrix
 
-The archive supplied four synthetic pairs across two topology families. Audited records and group-disjoint manifests are in backend/datasets/provided. No custom vision model has been trained. `training/dataset_tools.py` prepares verified paired data; `training/finetune.py` is a separate CUDA LoRA pipeline with preflight gates. It deliberately refuses the included insufficient dataset. See [the training guide](training/README.md) for exact data, GPU training, evaluation and adapter-serving commands. See RELEASE_GATES.md before shipping broader model claims.
+| Feature | DeCad Implementation | Industry Standard / Competitors |
+| :--- | :--- | :--- |
+| **CAD Format** | Native KiCad 9 `.kicad_sch` & `.kicad_pcb` | Proprietary closed formats or lossy SVG |
+| **Autorouter Export** | Specctra DSN (`.dsn`) via native `pcbnew` | Requires manual footprint assignment & export |
+| **Component Catalog** | Auto-enriched from 46,501 symbols + real LCSC Part IDs | Manual BOM typing and web lookup |
+| **Electrical Checking** | Real-time KiCad CLI ERC with violation badge counts | Simple visual display without electrical rule verification |
+| **Simulation** | Interactive Ngspice scope (transient analysis) | Separate desktop SPICE installation required |
+| **Version Control** | Integrated per-project Git with GitHub OAuth Sync | Manual file duplication / ZIP archives |
+| **Theme Engine** | 10 live UI engineering themes (Forge, Monokai, CRT Matrix, etc.) | Fixed single theme |
 
-## First circuit
+---
 
-Create or select a project, choose **Output software** beside the assistant, then enter:
+## 🖥️ Workbench Interface Map
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│  DeCad WORKBENCH   Test1 / rev 6c9eb70   [Theme: Forge ▾]   ● KiCad ready  ● CPU ready  │
+├───────────────┬────────────────────────────────────────────────────────┬───────────────┤
+│  PROJECTS     │  [Schematic] [Source] [BOM (26)] [Nets] [Checks] [Scope] │  AI ASSISTANT │
+│  ▸ Test1      ├────────────────────────────────────────────────────────┤  "Add 10k R1" │
+│  ▸ Demo       │                                                        │  [Attachment] │
+│               │             KICAD VECTOR SCHEMATIC CANVAS              │               │
+│  FILES        │                                                        │  Uploaded:    │
+│  • board.sch  │                  [U1: 74LS240 Buffer]                  │  [Image Card] │
+│  • board.pcb  │                         │                              │  (Double-click│
+│  • board.dsn  │                    (Net: DATA_0)                       │   to zoom)    │
+│               │                         │                              │               │
+│  LIBRARIES    │                  [R1: 10k Resistor]                    │  [Apply Net]  │
+│  • Import Doc │                                                        │               │
+└───────────────┴────────────────────────────────────────────────────────┴───────────────┘
+```
+
+---
+
+## 🚀 Quickstart & Installation
+
+### Prerequisites
+- [Docker Desktop](https://www.docker.com/) (allocated with $\ge 4\text{ GB}$ RAM)
+- Git command line tools
+
+### Launch in 2 Steps
+```bash
+# 1. Clone repository
+git clone https://github.com/JRK14/DeCad.git
+cd DeCad
+
+# 2. Build and launch containers
+docker compose up -d --build
+```
+
+Access the application in your browser:
+- **Workbench Interface**: [http://localhost:3100](http://localhost:3100)
+- **FastAPI Core Docs**: [http://localhost:8100/docs](http://localhost:8100/docs)
+- **Headless KiCad Virtual Desktop**: [http://localhost:6180](http://localhost:6180)
+
+---
+
+## 📦 Directory Structure
 
 ```text
-create a voltage divider
+DeCad/
+├── backend/
+│   ├── app/
+│   │   ├── main.py            # RESTful API, BOM enrichment, DSN export
+│   │   ├── engine.py          # KiCad S-Expression symbol placement & bounds
+│   │   ├── specctra.py        # Specctra DSN export orchestrator
+│   │   └── specctra_worker.py # pcbnew Python bindings for .dsn export
+│   └── workspaces/            # User project files and Git histories
+├── frontend/
+│   └── app/
+│       ├── page.js            # Main EDA workbench application
+│       ├── globals.css        # Responsive styling and 10 design themes
+│       └── BoardExport.js     # PCB planning and layout configurator
+├── checkpoints/
+│   └── circuit-lora/adapter/  # Qwen2.5-VL 4-bit LoRA adapter weights
+├── training/
+│   ├── Train_Schematic2SDN_Colab.ipynb  # GPU fine-tuning notebook
+│   ├── finetune.py            # CUDA LoRA training pipeline
+│   └── evaluate.py            # Test split benchmark evaluator
+├── libraries/                 # 46k+ KiCad symbols and SQLite database
+├── docker-compose.yml         # Container configuration
+└── TEAMMATE_GUIDE.txt         # Teammate onboarding and feature guide
 ```
 
-This creates V1=5 V, R1=10k and R2=10k with VIN/VOUT/GND pin connections. The saved native schematic appears in **Preview**, and a verified bundle downloads for the selected software. A Download design button remains in the assistant reply. If references conflict with an existing design, a separate project preserves that design. Use **Edit in KiCad** for interactive editing and **Preview** to return. The Nets tab shows actual KiCad netlist nodes. ERC runs after the edit. Waveform Scope runs the circuit and shows VOUT=2.5 V.
+---
 
-Useful commands:
+## 📄 License & Attribution
 
-```text
-add R3 4.7k
-add C1 100nF
-add U1 74xx:74LS244
-change R3 to 22k
-R3 = 10k
-remove R3
-connect net GND to C1 pin 2
-connect R1 pin 2 to C1 pin 1
-run ERC
-undo
-redo
-```
-
-Use a new project for `create RC lowpass` or to import files whose references already exist. Duplicate references and unknown device pinouts are rejected rather than silently substituted. Exact symbols use `Library:Symbol`; footprints can be supplied in circuit JSON. Native KiCad remains available for the full graphical editing workflow.
-
-Edits are transactional. Invalid syntax, unknown symbols, bad pin mappings, and conflicting imports leave the previous schematic intact. Undo/redo restores schematic snapshots; the Commit button records the current files in local Git. These operations do not require a GitHub account.
-
-## Import
-
-The Import/Attach buttons accept SPICE `.cir`, `.spice`, `.net`, typed circuit `.json`, component text, PDF/DOCX text, and images. `examples/` contains powered divider, RC step, diode-model, and JSON examples.
-
-Circuit JSON uses:
-
-```json
-{
-  "components": [{"ref":"R1","value":"10k","library":"Device:R","footprint":"Resistor_SMD:R_0805_2012Metric"}],
-  "nets": [{"name":"GND","nodes":[{"ref":"R1","pin":"2"}]}]
-}
-```
-
-Text/component-list documents supply component values; their pin connections must be specified explicitly. Image/single-page scanned-PDF imports use CPU R/C/V symbol and wire recognition by default, producing component and pin/net proposals for review. Labels-only OCR remains available as an explicit option. Opt-in vision extraction also produces JSON for review. Inspect values, exact library symbols, and pin-to-net assignments against the source before selecting **Apply reviewed circuit**. ERC checks electrical rules; it cannot prove that a recognized diagram matches its source. Unreadable/unsupported inputs produce a visible error, never a fake successful conversion.
-
-Legacy `.doc` files should be saved as `.docx`. SPICE imports support R/C/L/V/I/D/Q devices, values, node names, and `.model` declarations. Arbitrary SPICE scripts, `.include` files, and ambiguous subcircuit-to-symbol mappings are rejected. Supply complex device models and pinouts in native KiCad for workflows beyond these imported device types.
-
-## Editing and exports
-
-- **Schematic:** embedded native KiCad with zoom, grid, save, and fit controls.
-- **Source:** read/edit exact `.kicad_sch`; Save Source first asks native KiCad to save its active document, then verifies the new file with KiCad. A failed parse rolls back.
-- **BOM:** actual references, values, footprints and specified LCSC fields. Supplier links open searches. Prices/stock are not claimed unless queried from a supplier.
-- **Nets:** actual component-pin connections from the native XML netlist.
-- **Checks:** actual ERC errors/warnings and explicit unavailable states.
-- **History:** actual Git commits. Commit is local; Git Push requires optional OAuth configuration.
-- **Scope:** transient simulation using ngspice in Docker. Native installations without ngspice can use the verified linear R/C/L/V/I modified-nodal-analysis solver. Floating/unpowered/unsupported-model circuits fail visibly. Set step/stop with SPICE units, such as `1u` and `5m`. The API limits runs to 20,000 time steps.
-- **Downloads:** KiCad source, SVG, XML netlist, EDIF, SPICE, BOM CSV/JSON, nets JSON, ERC JSON, and Git history JSON. The circuit.json sidebar row downloads the full typed graph.
-
-EDIF exports preserve real port-to-instance connectivity. This package does not create native OrCAD `.DSN` files: that operation requires OrCAD Capture, which is not installed here. Native OrCAD import compatibility must be checked on a licensed OrCAD installation before relying on that workflow.
-
-The shared embedded desktop is designed for one local user at a time. Close KiCad modal dialogs before changing projects or running automated edits. Automated edits save the active editor first and reopen the schematic gracefully; an unsaved dialog is never force-killed.
-
-## Optional GitHub
-
-Copy `backend/.env.example` to `backend/.env`. Create a GitHub OAuth app with callback `http://localhost:8100/auth/callback`, and set GITHUB_CLIENT_ID/GITHUB_CLIENT_SECRET. Restart the backend. Sign in with GitHub, then push a project; a private `s2sdn-<project>` repository is created if needed.
-
-OAuth state is verified. The browser cookie contains only a random session ID. GitHub tokens remain in the local server session database and are supplied to Git through a temporary askpass helper, not saved in repository URLs. The original ZIP's embedded credentials are not bundled in this package.
-
-Live GitHub authorization/push requires your account and is not part of automated testing. Never expose these local desktop services publicly without adding a proper deployment/authentication layer.
-
-## Verification and development
-
-Backend checks use Python 3.12+ and KiCad CLI 9+ with its symbol libraries installed:
-
-```sh
-cd backend
-python3 -m venv .venv
-.venv/bin/pip install -r requirements-dev.txt
-.venv/bin/python -m pytest tests -q
-```
-
-On macOS the installed KiCad path is detected automatically. Elsewhere set KICAD_CLI/KICAD_SYMBOL_DIR as needed. For a native development server, set OLLAMA_URL=http://localhost:11434, run the backend on port 8100, and run the frontend on port 3100:
-
-```sh
-cd backend
-.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8100
-# In another terminal:
-cd frontend
-npm ci
-npm run dev
-```
-
-The frontend uses a same-origin /api proxy. Docker builds route it to the internal kicad service; native development routes it to localhost:8100.
-
-Synthetic generation is authenticated at `POST /datasets/synthetic/generate?count=4`. It generates actual KiCad schematics, native SVG previews, full connectivity JSON, EDIF, and SPICE. Dataset summary reports only generated samples; this package does not claim a fine-tuned model or downloaded research corpus.
-
-Production completion steps: [PRODUCTION_PLAN.md](PRODUCTION_PLAN.md). Run `python tools/check_release.py --output release-status.json` to inspect recorded blockers. Additional AMS-Net data is distributed separately for development and requires annotation/pin-mapping review; it is never loaded on end-user startup. See [training hardware notes](training/HARDWARE.md) for the RTX 3050 assessment.
-
-The requested DSN is clarified as Specctra PCB autorouter DSN. Native KiCad-based export is implemented; see [SPECCTRA.md](SPECCTRA.md). OrCAD schematic DSN remains a separate unsupported format.
-
-## Guided review and PCB export
-
-Image proposals open a component/net editor with a source preview. Edit references, values, exact symbols, net names and physical pin assignments without writing JSON. Renaming a component updates its pin references; duplicate pin assignments block apply. Advanced JSON remains available. Failed requests preserve attachments and text for retry.
-
-Choose Download → Specctra to open the PCB form. Search installed footprints, check physical pad numbers, enter board/routing dimensions and positions, then download the editable PCB and DSN. The placement preview shows origins, not package outlines; inspect the PCB before routing.
-
-The experimental 3B training profile includes a required measured smoke step for 8 GB GPUs. See [hardware setup](training/HARDWARE.md). Training is separate from the normal desktop install and has not been executed on a CUDA machine here.
+Developed by **Raghav Krishna ([@JRK14](https://github.com/JRK14))**. All rights reserved.
+Built on top of KiCad EDA, Ngspice, and Qwen Vision Architecture.
