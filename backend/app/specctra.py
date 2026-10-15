@@ -33,7 +33,8 @@ def export(graph,plan):
   if any('footprint' in issue['loc'] for issue in e.errors()):raise OperationError('Invalid footprint identifier. Choose an installed Library:Footprint.') from e
   raise OperationError('Invalid PCB plan: '+'; '.join('.'.join(map(str,issue['loc']))+': '+issue['msg'] for issue in e.errors())) from e
  if not graph.get('components') or not graph.get('nets'):raise OperationError('Add components and pin connections before exporting a PCB.')
- interpreter=os.getenv('KICAD_PYTHON',sys.executable)
+ native=Path('/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/Current/bin/python3')
+ interpreter=os.getenv('KICAD_PYTHON') or (str(native) if native.is_file() else sys.executable)
  if not Path(interpreter).is_file():
   interpreter=sys.executable
  with tempfile.TemporaryDirectory() as td:

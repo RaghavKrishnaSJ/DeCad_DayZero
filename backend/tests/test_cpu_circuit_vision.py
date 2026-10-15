@@ -44,9 +44,12 @@ def test_schematic_pdf_recovers_component_pin_connections(tmp_path):
  assert {n.name:{(x.ref,x.pin) for x in n.nodes} for n in circuit.nets}=={'VIN':{('V1','1'),('R1','1')},'VOUT':{('R1','2'),('R2','1')},'GND':{('V1','2'),('R2','2')}}
 
 @pytest.mark.skipif(not shutil.which('tesseract'),reason='Native Tesseract required')
-def test_unreadable_reference_does_not_silently_omit_component(tmp_path):
+def test_reduced_resolution_does_not_silently_omit_component(tmp_path):
  with Image.open(Path(__file__).parent/'vision_fixtures/divider.png') as im:im.resize((400,400)).save(tmp_path/'small.png')
- with pytest.raises(OperationError,match='reference/value'):extract(tmp_path/'small.png')
+ circuit=extract(tmp_path/'small.png')
+ assert {c.ref for c in circuit.components}=={'V1','R1','R2'}
+ assert {n.name for n in circuit.nets}=={'VIN','VOUT','GND'}
+ assert {c.ref:number(c.value) for c in circuit.components}=={'V1':5,'R1':10000,'R2':10000}
 
 from test_operations import client,create
 

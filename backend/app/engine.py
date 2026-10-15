@@ -180,7 +180,7 @@ class Schematic:
     def property(self,s,name):
         return next((p[2] for p in children(s,'property') if p[1]==name),'')
 
-    def add(self, ref, value, lib_id=None, footprint=None, x=None,y=None):
+    def add(self, ref, value, lib_id=None, footprint=None, x=None,y=None,angle=0):
         if self.get(ref):
             raise OperationError(f'{ref} already exists. Use change/set to update it.')
         if not lib_id:
@@ -224,31 +224,48 @@ class Schematic:
         else:
             y = float(y)
         symbol_id=uid()
-        s=E('symbol',E('lib_id',lib_id),E('at',N(x),N(y),N(0)),E('unit',A('1')),E('in_bom',A('yes')),E('on_board',A('yes')),E('dnp',A('no')),E('uuid',symbol_id))
+        s=E('symbol',E('lib_id',lib_id),E('at',N(x),N(y),N(angle)),E('unit',A('1')),E('in_bom',A('yes')),E('on_board',A('yes')),E('dnp',A('no')),E('uuid',symbol_id))
+        # Keep fields above both symbol body and outward net-label stubs.
+        pin_offsets=[float(child(pin,'at')[2]) for pin in self.definition_pins(definition,1)]
+        field_y=y-max([0,*pin_offsets])-12.7
         props={'Reference':ref,'Value':value,'Footprint':footprint or next((p[2] for p in children(definition,'property') if p[1]=='Footprint'),''),'Datasheet':next((p[2] for p in children(definition,'property') if p[1]=='Datasheet'),'')}
         for i,(key,val) in enumerate(props.items()):
             e=effects()
             if i>1:e.append(E('hide',A('yes')))
-            s.append(E('property',key,val,E('at',N(x+5.08),N(y+i*2.54),N(0)),e))
+            s.append(E('property',key,val,E('at',N(x),N(field_y+i*2.54),N(angle)),e))
         for pin in self.definition_pins(definition,1):
             s.append(E('pin',child(pin,'number')[1],E('uuid',uid())))
         root_id=child(self.tree,'uuid')[1]
         s.append(E('instances',E('project',self.project.name,E('path','/'+root_id,E('reference',ref),E('unit',A('1'))))))
         self.tree.append(s)
+        # Multi-unit packages share one reference, including their power unit.
+        units=sorted({int(block[1].rsplit('_',2)[1]) for block in children(definition,'symbol') if len(block[1].rsplit('_',2))==3 and block[1].rsplit('_',2)[1].isdigit() and int(block[1].rsplit('_',2)[1])>1 and block[1].rsplit('_',2)[2] in ('0','1')})
+        for index,unit in enumerate(units,1):
+            extra=copy.deepcopy(s);child(extra,'uuid')[1]=uid();child(extra,'unit')[1]=A(str(unit))
+            child(extra,'at')[2]=N(y+index*30.48)
+            for prop in children(extra,'property'):child(prop,'at')[2]=N(float(child(prop,'at')[2])+index*30.48)
+            extra[:]=[n for n in extra if not(isinstance(n,list) and n and n[0]=='pin')]
+            for pin in self.definition_pins(definition,unit):extra.append(E('pin',child(pin,'number')[1],E('uuid',uid())))
+            path=child(child(child(extra,'instances'),'project'),'path');child(path,'unit')[1]=A(str(unit))
+            self.tree.append(extra)
         return {'ref':ref,'value':value,'library':lib_id,'action':'added'}
 
     def set_value(self,ref,value):
-        s=self.get(ref)
-        if not s:raise OperationError(f'{ref} does not exist.')
-        prop=next(p for p in children(s,'property') if p[1]=='Value');prop[2]=value
+        symbols=[s for s in self.symbols() if self.reference(s)==ref]
+        if not symbols:raise OperationError(f'{ref} does not exist.')
+        for symbol in symbols:
+            next(p for p in children(symbol,'property') if p[1]=='Value')[2]=value
         return {'ref':ref,'value':value,'action':'modified'}
 
     def remove(self,ref):
-        s=self.get(ref)
-        if not s:raise OperationError(f'{ref} does not exist.')
-        # Remove labels anchored to this component's pins. Preserve other user geometry.
-        positions={(round(x,4),round(y,4)) for x,y in self.pin_positions(s).values()}
-        self.tree[:]=[n for n in self.tree if n is not s and not (isinstance(n,list) and n and n[0]=='label' and (round(float(child(n,'at')[1]),4),round(float(child(n,'at')[2]),4)) in positions)]
+        symbols=[s for s in self.symbols() if self.reference(s)==ref]
+        if not symbols:raise OperationError(f'{ref} does not exist.')
+        positions={tuple(round(v,4) for v in point) for symbol in symbols for point in self.pin_positions(symbol).values()}
+        ends=set(positions);remove=[]
+        for wire in children(self.tree,'wire'):
+            points=[tuple(round(float(v),4) for v in p[1:3]) for p in children(child(wire,'pts'),'xy')]
+            if any(p in positions for p in points):remove.append(wire);ends.update(points)
+        self.tree[:]=[n for n in self.tree if all(n is not x for x in [*symbols,*remove]) and not(isinstance(n,list) and n and n[0]=='label' and tuple(round(float(v),4) for v in child(n,'at')[1:3]) in ends)]
         return {'ref':ref,'action':'removed'}
 
     def definition_pins(self,definition,unit):
@@ -279,34 +296,30 @@ class Schematic:
         edits=[]
         pin_coords = []
         for ref,pin in nodes:
-            s=self.get(ref)
-            if not s:raise OperationError(f'Unknown component {ref}.')
+            symbols=[symbol for symbol in self.symbols() if self.reference(symbol)==ref]
+            if not symbols:raise OperationError(f'Unknown component {ref}.')
+            s=next((symbol for symbol in symbols if str(pin) in self.pin_positions(symbol)),symbols[0])
             pos=self.pin_positions(s).get(str(pin))
             if not pos:raise OperationError(f'{ref} has no pin {pin}.')
             x,y=pos
-            pin_coords.append((x,y))
-            existing=next((l for l in children(self.tree,'label') if abs(float(child(l,'at')[1])-x)<1e-4 and abs(float(child(l,'at')[2])-y)<1e-4),None)
+            # Named net stubs preserve connectivity without routing a guessed
+            # Manhattan path through unrelated symbol pins or other nets.
+            center=child(s,'at');dx=x-float(center[1]);dy=y-float(center[2])
+            horizontal=abs(dx)>abs(dy)
+            ex=x+(5.08 if dx>=0 else -5.08) if horizontal else x
+            ey=y if horizontal else y+(5.08 if dy>=0 else -5.08)
+            existing=next((l for l in children(self.tree,'label') if abs(float(child(l,'at')[1])-ex)<1e-4 and abs(float(child(l,'at')[2])-ey)<1e-4),None)
             if existing:existing[1]=net
-            else:self.tree.append(E('label',net,E('at',N(x),N(y),N(0)),effects(),E('uuid',uid())))
+            else:
+                self.tree.append(E('wire',E('pts',E('xy',N(x),N(y)),E('xy',N(ex),N(ey))),E('stroke',E('width',N(0)),E('type',A('default'))),E('uuid',uid())))
+                angle=0
+                label_effects=effects()
+                if horizontal and dx<0:
+                    justify=child(label_effects,'justify')
+                    if justify:justify[1:]=[A('right'),A('bottom')]
+                    else:label_effects.append(E('justify',A('right'),A('bottom')))
+                self.tree.append(E('label',net,E('at',N(ex),N(ey),N(angle)),label_effects,E('uuid',uid())))
             edits.append({'ref':ref,'pin':str(pin),'net':net,'action':'connected'})
-        
-        # Route clean orthogonal physical wires between pins on the same net
-        if len(pin_coords) >= 2:
-            for i in range(len(pin_coords) - 1):
-                x1, y1 = pin_coords[i]
-                x2, y2 = pin_coords[i+1]
-                if abs(x1 - x2) < 1e-4 or abs(y1 - y2) < 1e-4:
-                    # Straight wire segment
-                    self.tree.append(E('wire', E('pts', E('xy', N(x1), N(y1)), E('xy', N(x2), N(y2))),
-                                       E('stroke', E('width', N(0)), E('type', A('default'))), E('uuid', uid())))
-                else:
-                    # L-shaped orthogonal wire route with corner junction
-                    corner_x, corner_y = x2, y1
-                    self.tree.append(E('wire', E('pts', E('xy', N(x1), N(y1)), E('xy', N(corner_x), N(corner_y))),
-                                       E('stroke', E('width', N(0)), E('type', A('default'))), E('uuid', uid())))
-                    self.tree.append(E('wire', E('pts', E('xy', N(corner_x), N(corner_y)), E('xy', N(x2), N(y2))),
-                                       E('stroke', E('width', N(0)), E('type', A('default'))), E('uuid', uid())))
-                    self.tree.append(E('junction', E('at', N(corner_x), N(corner_y)), E('diameter', N(1.0)), E('color', N(0), N(0), N(0), N(0)), E('uuid', uid())))
         return edits
 
     def cached_export(self,operation,compute):
@@ -353,9 +366,39 @@ class Schematic:
 
     def preview(self):return self.cached_export('preview',self._preview)
 
-    def _preview(self):
+    def highlight_preview(self,svg,ref):
+        points=[point for symbol in self.symbols() if self.reference(symbol)==ref for point in self.pin_positions(symbol).values()]
+        if not points:return svg
+        x=min(p[0] for p in points)-4;y=min(p[1] for p in points)-4
+        w=max(10,max(p[0] for p in points)-x+4);h=max(10,max(p[1] for p in points)-y+4)
+        overlay=f'<rect x="{x}" y="{y}" width="{w}" height="{h}" fill="#639fff" fill-opacity="0.12" stroke="#3276cc" stroke-width="0.5" stroke-dasharray="1 0.6"/>'
+        return svg.replace('</svg>',overlay+'</svg>')
+
+    def content_preview(self):
+        import re
+        svg=self.cached_export('content-svg',lambda:self._preview(True))
+        points=[]
+        for symbol in self.symbols():
+            points.extend(self.pin_positions(symbol).values())
+            for prop in children(symbol,'property'):
+                if prop[1] not in ('Reference','Value'):continue
+                at=child(prop,'at');x,y=float(at[1]),float(at[2]);width=max(6,len(str(prop[2]))*1.1)
+                points.extend([(x-width/2,y-2),(x+width/2,y+2)])
+        for wire in children(self.tree,'wire'):
+            points.extend(tuple(map(float,p[1:3])) for p in children(child(wire,'pts'),'xy'))
+        for label in children(self.tree,'label'):
+            at=child(label,'at');x,y=float(at[1]),float(at[2]);width=max(5,len(label[1])*1.1)
+            points.extend([(x-width,y-2),(x+width,y+2)])
+        if not points:return svg
+        left=min(x for x,y in points)-10;top=min(y for x,y in points)-10
+        width=max(40,max(x for x,y in points)-left+10);height=max(35,max(y for x,y in points)-top+10)
+        svg=re.sub(r'viewBox="[^"]+"',f'viewBox="{left} {top} {width} {height}"',svg,count=1)
+        svg=re.sub(r'width="[^"]+" height="[^"]+"',f'width="{width}mm" height="{height}mm"',svg,count=1)
+        return svg
+
+    def _preview(self,content=False):
         with tempfile.TemporaryDirectory() as td:
-            run_cli('sch','export','svg','-o',td+'/',self.path)
+            run_cli('sch','export','svg',*(['--exclude-drawing-sheet','--no-background-color'] if content else []),'-o',td+'/',self.path)
             pages=sorted(Path(td).glob('*.svg'))
             if not pages:raise OperationError('KiCad did not produce an SVG preview.')
             return pages[0].read_text()

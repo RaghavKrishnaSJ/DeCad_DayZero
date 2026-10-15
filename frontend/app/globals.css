@@ -650,8 +650,32 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 .tabs-actions-right {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   position: relative;
+  flex-shrink: 0;
+}
+
+.icon-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: var(--panel2);
+  border: 1px solid var(--silver-border);
+  border-radius: 6px;
+  color: #c9d1d9;
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.icon-action-btn:hover {
+  background: #21262d;
+  color: #fff;
+  border-color: var(--accent);
 }
 
 .download-dropdown-menu {
@@ -1474,17 +1498,51 @@ textarea, pre, .mono { user-select: text; }
 .integrations-panel p{line-height:1.6}
 
 /* Wrap within the editor's own width, including wide windows with narrow panels. */
-.editor-tabs-bar { flex-wrap:wrap; align-items:flex-start; gap:8px; padding:8px; }
-.tabs-group-left { flex:1 1 520px; min-width:0; flex-wrap:wrap; }
-.tabs-actions-right { flex:0 1 auto; max-width:100%; flex-wrap:wrap; }
-.tab-btn { white-space:nowrap; padding:8px 10px; }
-.right-assistant-sidebar { min-width:0; }
-.assistant-header-bar { align-items:flex-start; }
-.assistant-title-row { flex:1 1 100%; min-width:0; }
-.assistant-header-bar > div { max-width:100%; flex-wrap:wrap; }
-.recognition-choice { display:flex;flex-direction:column;gap:6px;width:100%;font-size:11px;color:var(--muted); }
-.recognition-choice select { min-width:0;max-width:100%;padding:7px;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:5px; }
-.recognition-choice small { line-height:1.5; }
+.editor-tabs-bar { 
+  display: flex;
+  flex-wrap: wrap; 
+  align-items: center; 
+  justify-content: space-between;
+  gap: 8px; 
+  padding: 6px 12px; 
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  min-height: 42px;
+}
+.tabs-group-left { 
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto; 
+  min-width: 0; 
+  flex-wrap: wrap; 
+  gap: 4px;
+}
+.tabs-actions-right { 
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto; 
+  gap: 8px;
+}
+.tab-btn { white-space: nowrap; padding: 7px 12px; }
+.schematic-secondary-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #12161c;
+  border-bottom: 1px solid var(--line);
+  padding: 6px 12px;
+  font-size: 11px;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 38px;
+}
+.right-assistant-sidebar { min-width: 0; }
+.assistant-header-bar { align-items: flex-start; }
+.assistant-title-row { flex: 1 1 100%; min-width: 0; }
+.assistant-header-bar > div { max-width: 100%; flex-wrap: wrap; }
+.recognition-choice { display: flex; flex-direction: column; gap: 6px; width: 100%; font-size: 11px; color: var(--muted); }
+.recognition-choice select { min-width: 0; max-width: 100%; padding: 7px; background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 5px; }
+.recognition-choice small { line-height: 1.5; }
 
 /* Guided circuit review and PCB export stay inside the viewport. */
 .workflow-dialog{width:min(980px,94vw);max-height:92vh;overflow:auto;box-sizing:border-box;padding:24px}
@@ -1508,3 +1566,36 @@ textarea, pre, .mono { user-select: text; }
 .schematic-preview-scroll{width:100%;height:100%;overflow:auto;background:#fff;box-sizing:border-box;padding:12px}
 .schematic-preview-scroll img{display:block;max-width:none;height:auto;margin:0 auto}
 .chat-message-bubble[role=alert]{border-color:#a6544a;color:#ffb4ab}
+
+/* Engineering workspace: compact neutral chrome; color reserved for state. */
+.theme-forge{--bg:#191c20;--panel:#22262b;--panel2:#2a2f35;--panel-active:#343b43;--line:#3b424a;--line-strong:#525b65;--text:#e0e3e7;--muted:#a5adb6;--accent:#83a7c9;--green:#72a882}
+.workbench-grid{font-family:Arial,Helvetica,sans-serif;font-size:12px}
+.workbench-grid button,.workbench-grid select,.workbench-grid input{border-radius:2px!important;box-shadow:none!important;font-size:12px}
+.left-nav-sidebar,.right-assistant-sidebar{background:var(--panel);}
+.file-row{min-height:28px;font-size:12px}
+.file-group-label,.sidebar-subheading{letter-spacing:.4px;font-size:10px}
+.mono,.file-name-with-icon,.workflow-table input,.review-net input{font-family:Consolas,'SFMono-Regular',monospace}
+.welcome-main-headline{font-size:16px!important;font-weight:600!important;letter-spacing:0!important;background:none!important;color:var(--text)!important;-webkit-text-fill-color:var(--text)!important}
+.assistant-welcome-card{border-radius:0!important;background:transparent!important;box-shadow:none!important;padding:12px!important}
+.model-selector-pill{border-radius:2px!important;background:var(--panel2)!important}
+.application-launcher{padding:8px 10px;border-bottom:1px solid var(--line)}
+.launcher-heading{display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:600;margin-bottom:6px}
+.launcher-heading button{background:none;color:var(--muted);border:0;cursor:pointer}
+.launcher-tools{display:grid;gap:3px}
+.launcher-tools>button{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:29px;padding:4px 7px;background:var(--panel2);border:1px solid var(--line);color:var(--text);cursor:pointer;text-align:left}
+.launcher-tools>button:disabled{cursor:default;color:var(--muted)}
+.launcher-tools small,.launcher-note{font-size:10px;color:var(--muted)}
+.launcher-note{display:block;line-height:1.5;margin-top:6px}
+.application-launcher.compact{padding:6px 0}.compact .launcher-tools{grid-template-columns:1fr 1fr}.compact .launcher-tools>button{flex-wrap:wrap}
+.application-launcher p{font-size:11px;color:#e9ad74;overflow-wrap:anywhere}
+.review-entry{display:block;width:100%;padding:9px 6px;margin:8px 0;background:var(--panel-active);border:1px solid var(--accent);color:var(--text);cursor:pointer;font-weight:600}
+.workflow-dialog{width:min(1250px,96vw);border-radius:3px!important}
+.workflow-dialog details[open]{position:relative;border:1px solid var(--line);padding:10px;margin:12px 0}
+.workflow-dialog .source-preview{width:100%;max-height:48vh;object-fit:contain;resize:vertical;overflow:auto;background:#f5f3ed}
+.workflow-heading{position:sticky;top:-24px;background:var(--panel);z-index:2;padding:10px 0;border-bottom:1px solid var(--line)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.review-comparison{display:grid;grid-template-columns:minmax(280px,1fr) minmax(0,1.25fr);gap:18px;align-items:start}
+.review-source{position:sticky;top:55px;min-width:0}.review-editor{min-width:0}
+.review-comparison .source-preview{max-height:65vh}.review-comparison .workflow-table table{min-width:480px}
+.erc-status{background:transparent;border:1px solid var(--line);color:var(--text);cursor:pointer;font-size:11px;padding:2px 6px}
+@media(max-width:900px){.review-comparison{grid-template-columns:1fr}.review-source{position:static}}

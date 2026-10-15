@@ -10,11 +10,12 @@ export function circuitErrors(circuit) {
   const errors=[],refs=new Set(),names=new Set(),pins=new Set();
   if(!Array.isArray(circuit?.components)||!Array.isArray(circuit?.nets))return ['Components and nets must be lists.'];
   if(!circuit.components.length)errors.push('Add at least one component.');
+  if(!circuit.nets.length)errors.push('No connections recovered. Define and review physical pin connections before applying.');
   if(circuit.warnings!==undefined&&(!Array.isArray(circuit.warnings)||circuit.warnings.some(w=>typeof w!=='string')))errors.push('Warnings must be a list of text.');
   for(const c of circuit.components){
     if(!/^[A-Z][A-Z0-9_]*\d+$/.test(c.ref))errors.push(`Invalid reference: ${c.ref || '(empty)'}.`);
     if(refs.has(c.ref))errors.push(`Duplicate reference: ${c.ref}.`);refs.add(c.ref);
-    if(!String(c.value||'').trim())errors.push(`${c.ref}: enter a value.`);
+    if(!String(c.value||'').trim()||['UNKNOWN','?','UNREADABLE'].includes(String(c.value).trim().toUpperCase()))errors.push(`${c.ref}: enter a value.`);
   }
   for(const n of circuit.nets){
     if(!n.name?.trim()||/[\r\n"\\]/.test(n.name))errors.push('Enter a valid net name.');

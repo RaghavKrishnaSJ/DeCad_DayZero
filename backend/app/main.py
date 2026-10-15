@@ -166,8 +166,18 @@ async def token_login(body: TokenLogin, request: Request):
 def auth_config():
     return {'github': bool(GH_ID and GH_SECRET), 'local': LOCAL}
 
+class LocalLoginBody(BaseModel):
+    path: str | None = None
+
+@app.post('/auth/dev')
+def local_login(request:Request, body: LocalLoginBody = None):
+    if not LOCAL:raise HTTPException(403,'Local login is disabled.')
+    host_dir = body.path.strip() if body and body.path and body.path.strip() else None
+    put_session(request,{'user':{'login':'local','name':'Local User','token':None,'custom_host_dir':host_dir}},replace=True)
+    return {'ok':True}
+
 @app.get('/auth/dev')
-def local_login(request:Request):
+def local_login_get(request:Request):
     if not LOCAL:raise HTTPException(403,'Local login is disabled.')
     put_session(request,{'user':{'login':'local','name':'Local User','token':None}},replace=True)
     return {'ok':True}
@@ -197,11 +207,14 @@ async def callback(request:Request,code:str='',state:str='',error:str=''):
     put_session(request,{'user':{'login':identity['login'],'name':identity.get('name') or identity['login'],'token':token}},replace=True)
     return RedirectResponse(FRONTEND)
 
-def get_host_project_path(login_name: str, pid: str = '') -> str:
+def get_host_project_path(u: dict, pid: str = '') -> str:
+    custom = u.get('custom_host_dir')
+    if custom:
+        clean = custom.rstrip('/\\')
+        return f"{clean}/{safe_id(pid)}" if pid else clean
     host_base = os.getenv('HOST_PROJECTS_DIR') or str(ROOT)
-    # Normalize path separator
     base_clean = host_base.rstrip('/\\')
-    user_part = safe_id(login_name)
+    user_part = safe_id(u['login'])
     if pid:
         return f"{base_clean}/{user_part}/{safe_id(pid)}"
     return f"{base_clean}/{user_part}"
@@ -211,9 +224,10 @@ def me(u:dict=Depends(user)):
     return {
         'login':u['login'],
         'name':u['name'],
-        'git_linked':bool(u['token']),
+        'git_linked':bool(u.get('token')),
         'is_local': u['login'] == 'local',
-        'host_path': get_host_project_path(u['login'])
+        'host_path': get_host_project_path(u),
+        'custom_host_dir': u.get('custom_host_dir')
     }
 
 @app.post('/auth/logout')
@@ -275,7 +289,11 @@ def save_file(pid:str,name:str,body:FileText,u:dict=Depends(user)):
     return {'saved':name}
 
 @app.get('/projects/{pid}/preview.svg')
-def preview(pid:str,u:dict=Depends(user)):return Response(Schematic(pdir(u,pid)).preview(),media_type='image/svg+xml')
+def preview(pid:str,content:bool=False,highlight:str='',u:dict=Depends(user)):
+    schematic=Schematic(pdir(u,pid))
+    svg=schematic.content_preview() if content else schematic.preview()
+    if highlight:svg=schematic.highlight_preview(svg,highlight)
+    return Response(svg,media_type='image/svg+xml')
 
 @app.get('/projects/{pid}/graph')
 def graph(pid:str,u:dict=Depends(user)):return Schematic(pdir(u,pid)).graph()
@@ -292,6 +310,20 @@ async def vision_status():
             models=[m.get('name') for m in r.json().get('models',[])]
         return {'ready':model in models,'mode':'vision','model':model,'models':models,'accuracy_verified':False}
     except Exception:return {'ready':False,'mode':'vision','model':model,'models':[],'accuracy_verified':False}
+
+@app.get('/projects/{pid}/verification')
+def verification(pid:str,u:dict=Depends(user)):
+    from .circuit_layout import verify_graph
+    p=pdir(u,pid)
+    with project_lock(p):
+        sch=Schematic(p);actual=sch.graph();erc=sch.erc()
+        report={'source_accuracy':'not_measured','functional_correctness':'not_proven','native_components':len(actual['components']),'native_nets':len(actual['nets']),'erc':erc,'reviewed_proposal_match':None}
+        saved=p/'.reviewed-circuit.json'
+        if saved.exists():
+            expected=Circuit.model_validate_json(saved.read_text())
+            try:verify_graph(expected,actual,exact=True);report['reviewed_proposal_match']=True
+            except OperationError as e:report['reviewed_proposal_match']=False;report['difference']=str(e)
+        return report
 
 @app.get('/projects/{pid}/netlist')
 def netlist(pid:str,u:dict=Depends(user)):return Response(Schematic(pdir(u,pid)).netlist(),media_type='application/xml')
@@ -334,39 +366,14 @@ def details(pid:str,u:dict=Depends(user)):
             except Exception:
                 pass
 
-        val_upper = val.upper()
-        if not fp:
-            if val_upper.startswith('74LS') or val_upper.startswith('74HC') or val_upper.startswith('74HCT') or val_upper.startswith('CD40'):
-                fp = 'Package_DIP:DIP-20_W7.62mm' if any(k in val_upper for k in ['240', '241', '244', '245', '273', '373', '374', '377', '540', '541']) else 'Package_DIP:DIP-16_W7.62mm' if any(k in val_upper for k in ['138', '139', '151', '153', '157', '161', '163', '164', '165', '174', '175', '256', '248']) else 'Package_DIP:DIP-14_W7.62mm'
-            elif ref_prefix == 'R':
-                fp = 'Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal'
-            elif ref_prefix == 'C':
-                fp = 'Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P5.00mm'
-            elif ref_prefix == 'D':
-                fp = 'Diode_THT:D_DO-35_SOD27_P7.62mm_Horizontal'
-            elif ref_prefix == 'Q':
-                fp = 'Package_TO_SOT_THT:TO-92_Inline'
-            elif ref_prefix == 'U':
-                fp = 'Package_DIP:DIP-8_W7.62mm' if any(k in val_upper for k in ['555', '358', '741', '071', '081']) else 'Package_DIP:DIP-16_W7.62mm'
-
-        seed = int(hashlib.md5(f'{val}-{ref_prefix}'.encode()).hexdigest()[:6], 16)
-        if not part:
-            part = f'C{10000 + (seed % 90000)}'
-
-        if ref_prefix in ['R', 'C']:
-            unit_price = f'₹{round(0.45 + (seed % 30) * 0.05, 2)}'
-            stock = f'{5000 + (seed % 45000):,} in stock'
-        elif val_upper.startswith('74') or val_upper.startswith('CD'):
-            unit_price = f'₹{round(18.50 + (seed % 40) * 0.75, 2)}'
-            stock = f'{1200 + (seed % 8000):,} in stock'
-        else:
-            unit_price = f'₹{round(12.00 + (seed % 50) * 1.10, 2)}'
-            stock = f'{850 + (seed % 6000):,} in stock'
+        # Supplier availability is unknown without a live supplier lookup.
+        unit_price = 'Not queried'
+        stock = 'Not queried'
 
         c.update({
             'footprint': fp,
             'description': desc,
-            'lcsc': part,
+            'lcsc': part or 'Not specified',
             'supplier': 'LCSC / JLCPCB',
             'supplierUrl': 'https://www.lcsc.com/search?q=' + urllib.parse.quote(part or val),
             'unitPrice': unit_price,
@@ -424,12 +431,15 @@ def export_specctra_dsn_direct(pid:str,u:dict=Depends(user)):
     with project_lock(p):
         g=sch.graph()
     if not g.get('components'): raise HTTPException(400, 'Add components to the schematic before exporting DSN.')
+    missing = [c['ref'] for c in g['components'] if not c.get('footprint') or ':' not in c['footprint']]
+    if missing:
+        raise OperationError('Assign exact physical footprints in Export PCB + DSN before direct export: ' + ', '.join(missing))
     cols = max(2, math.ceil(math.sqrt(len(g['components']) * 1.25)))
     placements = {}
     for i, c in enumerate(g['components']):
-        fp = c.get('footprint') or 'Package_DIP:DIP-20_W7.62mm'
+        fp = c['footprint']
         placements[c['ref']] = {
-            'footprint': fp if ':' in fp else f'Package_DIP:{fp}',
+            'footprint': fp,
             'x_mm': 15.0 + (i % cols) * 25.0,
             'y_mm': 15.0 + (i // cols) * 25.0,
             'rotation_deg': 0.0
@@ -450,12 +460,15 @@ def export_specctra_dsn_direct(pid:str,u:dict=Depends(user)):
         raise HTTPException(500, f'Specctra DSN generation error: {str(e)}')
 
 @app.post('/projects/{pid}/export/specctra')
-def export_specctra(pid:str,plan:dict,u:dict=Depends(user)):
+def export_specctra(pid:str,plan:dict,dsn_only:bool=False,u:dict=Depends(user)):
     from .specctra import export
     try:
         with project_lock(pdir(u,pid)):
             data=export(Schematic(pdir(u,pid)).graph(),plan)
     except (KeyError,ValueError,subprocess.TimeoutExpired) as e:raise OperationError('Invalid PCB plan or timed-out export: '+str(e))
+    if dsn_only:
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            return Response(archive.read('board.dsn'),media_type='text/plain',headers={'Content-Disposition':f'attachment; filename="{pid}.dsn"'})
     return Response(data,media_type='application/zip',headers={'Content-Disposition':f'attachment; filename="{pid}-specctra.zip"'})
 
 @app.get('/projects/{pid}/export/edif')
@@ -531,6 +544,24 @@ def integration_open(pid:str,tool:str,u:dict=Depends(user)):
     with project_lock(p):
         prepare_embedded(p)
         return enqueue(STATE,u['login'],tool,p,simulation_controls(p))
+
+class OpenFileRequest(BaseModel):
+    name:str=Field(min_length=1,max_length=1024)
+    tool:Literal['kicad','ngspice','ltspice','qucs-s']
+    mode:Literal['original','convert']='original'
+
+@app.get('/projects/{pid}/file-association')
+def file_association(pid:str,name:str,u:dict=Depends(user)):
+    from .file_dispatch import inspect
+    return inspect(public_file(pdir(u,pid),name))
+
+@app.post('/projects/{pid}/open-file')
+def open_project_file(pid:str,body:OpenFileRequest,u:dict=Depends(user)):
+    from .file_dispatch import enqueue_file
+    p=pdir(u,pid);path=public_file(p,body.name)
+    with project_lock(p):
+        if body.mode=='convert':return enqueue(STATE,u['login'],body.tool,p,simulation_controls(p))
+        return enqueue_file(STATE,u['login'],body.tool,path)
 
 @app.get('/integrations/jobs/{jid}')
 def integration_job(jid:str,u:dict=Depends(user)):
@@ -652,11 +683,24 @@ class Proposal(BaseModel):
 
 @app.post('/projects/{pid}/import')
 def apply_import(pid:str,body:Proposal,u:dict=Depends(user)):
+    if not body.circuit.nets:raise OperationError('No connections were recovered. Add and review physical pin connections before applying.')
+    unknown=[c.ref for c in body.circuit.components if c.value.strip().upper() in ('UNKNOWN','?','UNREADABLE')]
+    if unknown:raise OperationError('Enter the unreadable component values before applying: '+', '.join(unknown))
     p=pdir(u,pid)
     with project_lock(p):
         prepare_embedded(p)
         sch=Schematic(p);before=sch.path.read_text()
-        try:edits=apply_circuit(sch,body.circuit);sch.save();sch.graph();remember(p,before,'Apply reviewed import')
+        try:
+            edits=apply_circuit(sch,body.circuit);sch.save()
+            from .circuit_layout import verify_graph
+            verify_graph(body.circuit,sch.graph())
+            atomic_text(p/'.reviewed-circuit.json',body.circuit.model_dump_json())
+            if body.circuit.models:
+                model_file=p/'.simulation.json'
+                settings=json.loads(model_file.read_text()) if model_file.exists() else {}
+                settings['directives']=list(dict.fromkeys(settings.get('directives',[])+body.circuit.models))
+                atomic_text(model_file,json.dumps(settings))
+            remember(p,before,'Apply reviewed import')
         except Exception:atomic_text(sch.path,before);raise
     refresh_embedded(p,quiet=True)
     return requested_output({'edits':edits,'validation':sch.erc()},p,body.output_tool)

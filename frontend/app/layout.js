@@ -1,4 +1,5 @@
 import './globals.css';
+import './experiences.css';
 
 export const metadata = {
   title: 'DeCad — Circuit Workbench',

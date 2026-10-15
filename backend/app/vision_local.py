@@ -50,7 +50,7 @@ def ocr_candidates(tsv):
   if not re.fullmatch(r'[RCLVUJQD]\d+',ref,re.I):continue
   ref=ref.upper()
   candidates=[other for other in words if re.fullmatch(VALUE,other['text']) and 0<other['y']-word['y']<=max(120,word['h']*6) and abs(other['x']+other['w']/2-word['x']-word['w']/2)<=max(60,word['w']*2)]
-  value=min(candidates,key=lambda other:other['y']-word['y'])['text'] if candidates else '10k' if ref.startswith('R') else '100nF' if ref.startswith('C') else 'IC'
+  value=min(candidates,key=lambda other:other['y']-word['y'])['text'] if candidates else 'UNKNOWN'
   if ref in seen:continue
   seen.add(ref);components.append(Component(ref=ref,value=value))
  if not components:raise OperationError('OCR did not recover reference/value pairs. Review the image manually or supply JSON/SPICE.')

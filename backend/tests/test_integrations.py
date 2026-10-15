@@ -56,7 +56,7 @@ def test_source_conflict_preserves_newer_content(client):
 def test_model_plan_does_not_mutate(client,monkeypatch):
  from app import model_runtime
  create(client);before=client.get('/projects/Circuit/graph').json()
- async def mocked(*args,**kw):return {'content':'{"kind":"voltage_divider"}','model':'mock','elapsed_seconds':0}
+ async def mocked(*args,**kw):return {'content':template('divider').model_dump_json(),'model':'mock','elapsed_seconds':0}
  monkeypatch.setattr(model_runtime,'call',mocked)
  r=client.post('/ai/plan',json={'project':'Circuit','message':'Create a divider V1 12, R1 10k, R2 22k'})
  assert r.status_code==200 and len(r.json()['proposal']['nets'])==3

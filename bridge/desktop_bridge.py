@@ -30,6 +30,16 @@ def process(folder,apps):
  if Path(name).name!=name or path.is_symlink() or not path.is_file():raise ValueError('Invalid application artifact.')
  if not apps[tool]['installed']:raise ValueError('Application is not installed.')
  exe=apps[tool]['path']
+ if tool=='kicad':
+  suffix=path.suffix.lower()
+  if platform.system()=='Darwin':
+   editor=Path('/Applications/KiCad')/('PCB Editor.app' if suffix=='.kicad_pcb' else 'Schematic Editor.app' if suffix in ('.kicad_sch','.sch') else 'KiCad.app')
+   if editor.is_dir():exe=str(editor)
+  elif suffix=='.kicad_pcb':
+   board=Path(exe).with_name('pcbnew.exe' if platform.system()=='Windows' else 'pcbnew')
+   executable=str(board) if board.is_file() else shutil.which('pcbnew')
+   if not executable:raise ValueError('KiCad PCB Editor is not installed or configured.')
+   exe=executable
  if platform.system()=='Darwin' and exe.endswith('.app'):command=['open','-a',exe,str(path.resolve())]
  elif tool=='ngspice':command=[exe,'-b',str(path.resolve())]
  else:command=[exe,str(path.resolve())]

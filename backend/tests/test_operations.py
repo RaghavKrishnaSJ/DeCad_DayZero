@@ -116,6 +116,10 @@ def test_spice_upload_import(client):
     assert r.status_code==200
     r=client.post('/ai/chat',json={'project':'Circuit','message':'Import reference','attachments':['references/input.cir']})
     assert r.status_code==200,r.text
+    assert client.get('/projects/Circuit/graph').json()['components']==[]
+    proposal=r.json()['proposal']
+    assert client.post('/projects/Circuit/import',json={'circuit':proposal}).status_code==200
+    assert client.get('/projects/Circuit/verification').json()['reviewed_proposal_match'] is True
     assert client.get('/projects/Circuit/simulate').json()['data'][-1]['vout']==pytest.approx(2.5)
 
 def test_conversation_does_not_mutate(client):

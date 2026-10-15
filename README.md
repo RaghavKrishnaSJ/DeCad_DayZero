@@ -15,6 +15,13 @@
   Just as Cursor and Antigravity modernized software development through in-context pair programming and autonomous code synthesis, <b>DeCad brings agentic pair-engineering to physical electronics</b>: synthesizing native KiCad schematics, auto-routing via Specctra DSN, running simulation checks, and sourcing real components in real time.
 </p>
 
+<!-- Live Animated Experience Showcase -->
+<p align="center">
+  <img src="evidence/experiences/experiences_showcase.gif" alt="DeCad Multi-Experience Animated Showcase" width="100%" style="border-radius: 8px; border: 1px solid #30363d; box-shadow: 0 16px 36px rgba(0,0,0,0.6);" />
+  <br/>
+  <em>⚡ Dynamic Workspace Experiences: Classic EDA &middot; Studio IDE &middot; Canvas &middot; Review Desk &middot; Simulation Lab</em>
+</p>
+
 ---
 
 </div>
@@ -146,7 +153,91 @@ sequenceDiagram
 
 ---
 
-## Quickstart & Installation
+## 🎨 Five Distinct Engineering Workspaces (Zero Cookie-Cutter Layouts)
+
+Unlike standard software tools that simply toggle CSS color variables, **DeCad re-architects the layout, tool rails, diagnostics docks, and interaction models for each engineering phase**:
+
+<table>
+  <tr>
+    <td width="50%">
+      <h3 align="center">1. Classic EDA (Engineering Desktop)</h3>
+      <a href="evidence/experiences/experience-classic.png"><img src="evidence/experiences/experience-classic.png" alt="Classic EDA Desktop" width="100%"/></a>
+      <p><b>Focus:</b> Capture &middot; Inspect &middot; Build</p>
+      <ul>
+        <li>Authentic light engineering aesthetic modeled after Cadence OrCAD / Altium Designer.</li>
+        <li>Dual-tier command ribbons with persistent physical pin property inspector.</li>
+        <li>Split-pane build output, console netlist explorer, and quick prompt execution dock.</li>
+      </ul>
+    </td>
+    <td width="50%">
+      <h3 align="center">2. Studio IDE (Developer Dark Flow)</h3>
+      <a href="evidence/experiences/experience-ide.png"><img src="evidence/experiences/experience-ide.png" alt="Studio IDE" width="100%"/></a>
+      <p><b>Focus:</b> Explore &middot; Edit &middot; Diagnose</p>
+      <ul>
+        <li>Full dark document workspace with project hierarchy explorer and breadcrumbs.</li>
+        <li>Dockable real-time diagnostic problems panel with ERC violation tracking.</li>
+        <li>Direct integration with AI prompt engineering sidebar and automated model routing.</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <h3 align="center">3. Canvas (Distraction-Free Drafting)</h3>
+      <a href="evidence/experiences/experience-canvas.png"><img src="evidence/experiences/experience-canvas.png" alt="Canvas Workspace" width="100%"/></a>
+      <p><b>Focus:</b> Draw &middot; Navigate &middot; Focus</p>
+      <ul>
+        <li>Maximized high-resolution vector canvas with radial grid backdrop.</li>
+        <li>Floating vertical tool rail for instant placement, routing, and symbol selection.</li>
+        <li>On-demand modal assistant drawer that minimizes automatically during deep CAD drafting.</li>
+      </ul>
+    </td>
+    <td width="50%">
+      <h3 align="center">4. Review Desk (Dual Verification Gate)</h3>
+      <a href="evidence/experiences/experience-review.png"><img src="evidence/experiences/experience-review.png" alt="Review Desk" width="100%"/></a>
+      <p><b>Focus:</b> Compare &middot; Correct &middot; Approve</p>
+      <ul>
+        <li>Side-by-side synchronized comparison of original input (PDF/image) vs synthesized KiCad circuit.</li>
+        <li>4-point verification checklist (faint parts, reference designators, rail polarity, pin connections).</li>
+        <li>Zero-blind-commit guarantee: review net differences before committing to CAD.</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <h3 align="center">5. Simulation Lab (Hardware Testbench)</h3>
+      <p align="center"><a href="evidence/experiences/experience-lab.png"><img src="evidence/experiences/experience-lab.png" alt="Simulation Lab" width="90%"/></a></p>
+      <p align="center"><b>Focus:</b> Measure &middot; Simulate &middot; Analyze</p>
+      <ul>
+        <li>Integrated interactive transient analyzer with embedded multi-channel digital oscilloscope.</li>
+        <li>Live signal probe readings ($V_{\text{IN}}$, $V_{\text{OUT}}$) and real-time waveform acquisition.</li>
+        <li>Seamless one-click dispatch to native external simulators (Ngspice, LTspice, Qucs-S).</li>
+      </ul>
+    </td>
+  </tr>
+</table>
+
+---
+
+## ⚡ Universal Application Mapping & File Dispatch
+
+DeCad features an automated file association engine that inspects uploaded attachments or workspace files, automatically recommending the native EDA desktop application while allowing full engineer override:
+
+```mermaid
+graph LR
+    File["Input File (.kicad_sch, .cir, .asc, .sch, .dsn)"] --> Detection["Format & Extension Analyzer"]
+    Detection --> AutoMap{"Recommended Application"}
+    AutoMap -->|*.kicad_sch / *.kicad_pcb| App1["KiCad 9.0 Suite"]
+    AutoMap -->|*.cir / *.sp / *.net| App2["Ngspice Interactive"]
+    AutoMap -->|*.asc / *.raw| App3["LTspice Simulator"]
+    AutoMap -->|*.sch (Qucs) / *.dpl| App4["Qucs-S Universal GUI"]
+    AutoMap -->|*.dsn| App5["Freerouting Autorouter"]
+    Detection --> Override["Manual Engineer Selection & Format Conversion"]
+```
+
+* **Direct Original Launch**: Launch the exact file in its dedicated native host application via the Desktop Bridge.
+* **Intelligent Circuit Handoff**: Synthesize and translate current project schematics to any external tool on the fly.
+
+---
 
 ### Prerequisites
 - [Docker Desktop](https://www.docker.com/) (allocated with at least 4 GB RAM)

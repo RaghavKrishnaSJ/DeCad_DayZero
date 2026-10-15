@@ -34,11 +34,29 @@ def undo_redo(project,redo=False):
 
 
 def apply_circuit(sch,circuit):
+    from .circuit_layout import positions,route
+    placement=positions(circuit)
+    from .sexpr import child
+    previous=sch.symbols()
+    offset=max(float(child(symbol,'at')[2]) for symbol in previous)+50.8 if previous else 0
     edits=[]
     for c in circuit.components:
         if sch.get(c.ref):raise OperationError(f'Import conflicts with existing {c.ref}. Use a new project or rename references.')
-        edits.append(sch.add(c.ref,c.value,c.library,c.footprint))
+        x,y,angle=placement[c.ref]
+        edits.append(sch.add(c.ref,c.value,c.library,c.footprint,x=x,y=y+offset,angle=angle))
+    # Give every instantiated package unit its own cell before wiring.
+    new_symbols=[symbol for symbol in sch.symbols() if sch.reference(symbol) in {c.ref for c in circuit.components}]
+    if len(new_symbols)>len(circuit.components):
+        from .sexpr import child,children
+        from .engine import N
+        for i,symbol in enumerate(new_symbols):
+            at=child(symbol,'at');nx=50.8+(i%5)*63.5;ny=50.8+(i//5)*63.5+offset
+            dx=nx-float(at[1]);dy=ny-float(at[2]);at[1]=N(nx);at[2]=N(ny)
+            for prop in children(symbol,'property'):
+                pat=child(prop,'at');pat[1]=N(float(pat[1])+dx);pat[2]=N(float(pat[2])+dy)
     for n in circuit.nets:edits.extend(sch.connect(n.name,[(p.ref,p.pin) for p in n.nodes]))
+    unresolved=route(sch,{n.name for n in circuit.nets})
+    if unresolved:circuit.warnings.append('Named-net connections retained where physical routing is congested: '+', '.join(unresolved))
     return edits
 
 
@@ -141,15 +159,8 @@ def template(kind, **kwargs):
             Net(name='OE_BUS', nodes=[Node(ref='U1', pin='1'), Node(ref='U1', pin='19'), Node(ref='R1', pin='2')])
         ])
 
-    return Circuit(components=[
-        Component(ref='V1', value=vin, library='Simulation_SPICE:VDC'),
-        Component(ref='R1', value=r1, library='Device:R'),
-        Component(ref='C1', value=c1, library='Device:C')
-    ], nets=[
-        Net(name='VIN', nodes=[Node(ref='V1', pin='1'), Node(ref='R1', pin='1')]),
-        Net(name='VOUT', nodes=[Node(ref='R1', pin='2'), Node(ref='C1', pin='1')]),
-        Net(name='GND', nodes=[Node(ref='C1', pin='2'), Node(ref='V1', pin='2')])
-    ])
+    raise OperationError('Unknown circuit template: '+str(kind))
+
 
 
 async def explanation(message):
@@ -174,15 +185,15 @@ async def execute(message,project,attachment_paths=None,before_mutation=None,rec
         circuits=[]
         for path in attachment_paths:
             c,d=await ingest(path,recognition_mode=recognition_mode) if recognition_mode else await ingest(path);circuits.append(c);directives.extend(d)
-        circuit=Circuit(components=[c for g in circuits for c in g.components],nets=[n for g in circuits for n in g.nets],warnings=[w for g in circuits for w in g.warnings])
+        circuit=Circuit(components=[c for g in circuits for c in g.components],nets=[n for g in circuits for n in g.nets],warnings=[w for g in circuits for w in g.warnings],models=[m for g in circuits for m in g.models])
         # Vision imports produce a reviewable proposal, not an unreviewed mutation.
-        if circuit.warnings:
+        if circuit:
             return {'reply':'Review the extracted component/pin/net graph before applying it. '+ ' '.join(circuit.warnings),'route':'import_review','proposal':circuit.model_dump(),'edits':[]}
     elif re.search(r'\b(analy[sz]e|generate|synthesi[sz]e)\b',lower) and re.search(r'\b(uploaded|attached|file)\b',lower):
         raise OperationError('Attach a schematic PDF/image, SPICE netlist or circuit JSON using the paperclip or Import circuit source. No file was attached to this request.')
     elif text.startswith('{'):circuit=parse_json(text)
     elif re.search(r'^\s*[RCLVI]\d+\s+\S+\s+\S+\s+\S+',text,re.M) and '\n' in text:circuit,directives=parse_spice(text)
-    elif (re.search(r'\b(?:voltage\s+)?divider\b',lower) or 'lowpass' in lower or 'highpass' in lower or 'opamp' in lower or 'inverting' in lower or 'rectifier' in lower or '555' in lower or 'timer' in lower or 'transceiver' in lower or '74ls244' in lower) and not re.match(r'^(remove|delete|connect|change|set|replace)\b',lower):
+    elif re.fullmatch(r'(?:(?:create|build|make|describe|i need|i want)\s+)?(?:a\s+)?(?:voltage\s+divider|divider|rc\s+(?:lowpass|highpass)|lowpass|highpass)(?:\s+(?:circuit|filter))?[.!]?',lower):
         try:values={c.ref:c.value for c in parse_text(text).components}
         except OperationError:values={}
         kind = ('divider' if 'divider' in lower
@@ -193,6 +204,9 @@ async def execute(message,project,attachment_paths=None,before_mutation=None,rec
                 else 'transceiver' if 'transceiver' in lower or '74ls244' in lower or 'bus buffer' in lower
                 else 'rc')
         circuit = template(kind, r1=values.get('R1', '10k'), r2=values.get('R2', '10k'), c1=values.get('C1', '100nF'), vin=values.get('V1', '5'))
+    if circuit is None and not re.match(r'^(help|run|erc|check|validate|undo|redo|remove|delete|connect|change|set|replace|add|place|insert|acquire)\b',lower) and not re.match(rf'^\s*{REF}\s*(=|should\s+be|is|to)\s*',text,re.I):
+        from .model_runtime import synthesize
+        return await synthesize(text,Schematic(project).graph())
     return await asyncio.to_thread(_execute_local,text,lower,project,circuit,directives,before_mutation)
 
 def _execute_local(text,lower,project,circuit,directives,before_mutation=None):
@@ -216,7 +230,18 @@ def _execute_local(text,lower,project,circuit,directives,before_mutation=None):
                 if net_match:net=net_match[1]
                 elif len(nodes)>=2:net=f'NET_{nodes[0][0]}_{nodes[0][1]}'
                 else:raise OperationError('Specify a net name and component pin(s).')
-                edits=sch.connect(net,nodes)
+                # Rebuild the explicit graph so a reassigned pin cannot remain
+                # physically tied to its previous net by existing drawn wires.
+                graph=sch.graph();moved=set(nodes);rebuilt=[]
+                for original in graph['nets']:
+                    remaining=[p for p in original['nodes'] if (p['ref'],p['pin']) not in moved]
+                    if remaining:rebuilt.append({'name':original['name'],'nodes':remaining})
+                target=next((n for n in rebuilt if n['name']==net),None)
+                if target is None:target={'name':net,'nodes':[]};rebuilt.append(target)
+                target['nodes'].extend({'ref':ref,'pin':pin} for ref,pin in nodes)
+                circuit=Circuit.model_validate({'components':graph['components'],'nets':rebuilt})
+                sch.tree[:]=[n for n in sch.tree if not(isinstance(n,list) and n and n[0] in ('symbol','wire','junction','label'))]
+                edits=apply_circuit(sch,circuit)
             elif re.match(r'^(change|set|replace)\b',lower) or re.match(rf'^\s*{REF}\s*(=|should\s+be|is|to)\s*',text,re.I):
                 matches=list(re.finditer(rf'\b({REF})\s*(?:should\s+be|=|to|value|is)\s*({VALUE})',text,re.I))
                 if not matches:raise OperationError('Use change R1 to 4.7k or R1 = 4.7k.')
@@ -227,7 +252,10 @@ def _execute_local(text,lower,project,circuit,directives,before_mutation=None):
             if edits and lower not in ['undo','redo']:
                 sch.save()
                 # Parsing via the native exporter is part of the transaction.
-                sch.graph()
+                actual=sch.graph()
+                if circuit:
+                    from .circuit_layout import verify_graph
+                    verify_graph(circuit,actual)
                 remember(project,before,text)
             if directives:atomic_text(project/'.simulation.json',json.dumps({'directives':directives}))
         except Exception:

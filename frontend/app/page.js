@@ -4,6 +4,13 @@ import CircuitReveal from './CircuitReveal';
 import IntegrationsPanel from './IntegrationsPanel';
 import CircuitReview from './CircuitReview';
 import BoardExport from './BoardExport';
+import ApplicationLauncher from './ApplicationLauncher';
+import SchematicViewport from './SchematicViewport';
+import ClassicDesktop from './ClassicDesktop';
+import OpenFileDialog from './OpenFileDialog';
+import VerificationReport from './VerificationReport';
+import CircuitTools from './CircuitTools';
+import {ExperiencePicker,ExperienceMenu,ProjectHierarchy,PropertyInspector,SourcePane,ReviewChecklist,LabInstrument,WorkspaceDock,SynthesisStatus,EXPERIENCES} from './Experiences';
 
 const CYCLE_MS = 10000;
 const API = process.env.NEXT_PUBLIC_API_URL || '/api';
@@ -38,7 +45,17 @@ export default function Page() {
   const [downloadMenu, setDownloadMenu] = useState(false);
   const [gitPushMenu, setGitPushMenu] = useState(false);
   const [userMenu, setUserMenu] = useState(false);
-  const [theme, setTheme] = useState('theme-forge'); // 10 styles: Forge, Nebula, Phosphor, Neon, Daylight, Cyberpunk, Monokai, Obsidian, Blueprint, Solarized
+  const [experience,setExperience]=useState('ide');
+  const [selectedComponent,setSelectedComponent]=useState('');
+  const [assistantExpanded,setAssistantExpanded]=useState(false);
+  const [openFileDialog,setOpenFileDialog]=useState(null);
+  const [showVerification,setShowVerification]=useState(false);
+  const [circuitTool,setCircuitTool]=useState(null);
+  const [canvasGrid,setCanvasGrid]=useState(true);
+  useEffect(()=>{try{const saved=localStorage.getItem('decad.experience.v2');if(EXPERIENCES.some(e=>e.id===saved))setExperience(saved);}catch{}},[]);
+  const changeExperience=value=>{setExperience(value);setAssistantExpanded(false);setTab('schematic');try{localStorage.setItem('decad.experience.v2',value);}catch{}};
+  useEffect(()=>{const key=e=>{if((e.ctrlKey||e.metaKey)&&e.shiftKey&&/^[1-5]$/.test(e.key)){e.preventDefault();changeExperience(EXPERIENCES[Number(e.key)-1].id);}};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[]);
+
   const [pipelineStages, setPipelineStages] = useState(null);
   const [simData, setSimData] = useState(null);
   const [simError, setSimError] = useState('');
@@ -46,8 +63,10 @@ export default function Page() {
   const [health, setHealth] = useState(null);
   const [vision, setVision] = useState({ready:false});
   const [proposal, setProposal] = useState(null);
+  const [inspectCurrent,setInspectCurrent]=useState(false);
   const [proposalSource, setProposalSource] = useState(null);
   const [boardGraph, setBoardGraph] = useState(null);
+  const [dsnOnly,setDsnOnly]=useState(false);
   const [busy, setBusy] = useState(false);
   const [simStep, setSimStep] = useState('10u');
   const [simStop, setSimStop] = useState('10m');
@@ -75,8 +94,8 @@ export default function Page() {
       else if(action==='zoom_out')setPreviewZoom(z=>Math.max(.5,z/1.25));
       else if(action==='zoom_fit')setPreviewZoom(1);
       else if(action==='redraw')await refresh();
-      else if(action==='save')setStatus('Schematic changes are saved automatically');
-      else if(action==='grid')setStatus('Grid controls are available in the KiCad editor');
+      else if(action==='save'){if(sourceDirty)await saveSource();else setStatus('All circuit changes are saved.');}
+      else if(action==='grid')setCanvasGrid(value=>!value);
       else {await f(`/projects/${pid}/control?action=${action}`,{method:'POST'});await refresh();}
       return;
     }
@@ -84,9 +103,9 @@ export default function Page() {
     catch (e) { setStatus(e.message); }
   };
   const openNative = async () => {
-    if (!pid) return;
-    try { const r = await f(`/projects/${pid}/open-native`, { method: 'POST' }); setStatus((await r.json()).status); if(health?.embedded)setEditorMode('embedded'); }
-    catch (e) { setStatus(e.message); }
+    if(!pid)return;
+    if(health?.embedded){setEditorMode('embedded');return;}
+    setOpenFileDialog(files.find(n=>n.endsWith('.kicad_sch'))||'');
   };
   const saveSource = async () => {
     const name = selectedFile || files.find(n => n.endsWith('.kicad_sch'));
@@ -102,10 +121,11 @@ export default function Page() {
     try { const r = await f(`/projects/${pid}/git/commit`, {method:'POST',body:JSON.stringify({message:'Update circuit schematic'})}); const j=await r.json(); setStatus(j.committed ? `Committed ${j.hash}` : 'No changes to commit'); await refresh(); }
     catch (e) { setStatus(e.message); }
   };
-  const planWithModel = async () => {
-    if (!input.trim() || !pid || busy) return;
+  const planWithModel = async (message) => {
+    const prompt=typeof message==='string'?message:input;
+    if (!prompt.trim() || !pid || busy) return;
     setBusy(true);setStatus('Planning with the local model...');
-    try {const j=await (await f('/ai/plan',{method:'POST',body:JSON.stringify({project:pid,message:input})})).json();setProposal(j.proposal);setProposalSource(null);setStatus(`Review ${j.inference.model} proposal`);}
+    try {const j=await (await f('/ai/plan',{method:'POST',body:JSON.stringify({project:pid,message:prompt})})).json();setProposal(j.proposal);setProposalSource(null);setStatus(`Review ${j.inference.model} proposal`);}
     catch(e){setStatus(e.message);setMsgs(m=>[...m,{text:e.message,error:true}]);}finally{setBusy(false);}
   };
 
@@ -128,7 +148,7 @@ export default function Page() {
   const [msgs, setMsgs] = useState([]);
   const [input, setInput] = useState('');
   const [attachedFiles, setAttachedFiles] = useState([]);
-  const [recognitionMode,setRecognitionMode]=useState('circuit');
+  const [recognitionMode,setRecognitionMode]=useState('vision');
   const [outputTool,setOutputTool]=useState('kicad');
   const [uploading,setUploading]=useState(false);
   const submissionLock=useRef(false);
@@ -141,6 +161,8 @@ export default function Page() {
   const [showTokenModal, setShowTokenModal] = useState(false);
   const [githubTokenInput, setGithubTokenInput] = useState('');
   const [modalImage, setModalImage] = useState(null);
+  const [showWorkspaceModal, setShowWorkspaceModal] = useState(false);
+  const [workspacePathInput, setWorkspacePathInput] = useState('');
 
   // On mount check session
   useEffect(() => {
@@ -246,7 +268,7 @@ export default function Page() {
   // Real-time EventSource listener & KiCad container project activation
   useEffect(() => {
     if (pid) {
-      setProjectData(null); setSimData(null); setProposal(null); setSelectedFile(null); setMsgs(pendingMessage.current?[pendingMessage.current]:[]);pendingMessage.current=null;setSourceDirty(false);setSourceHash(null);
+      setProjectData(null); setSimData(null); setProposal(null); setSelectedFile(null); setMsgs(pendingMessage.current?[pendingMessage.current]:[]);pendingMessage.current=null;setSourceDirty(false);setSourceHash(null);setSelectedComponent('');
       refresh();
       // Inform live KiCad container to open this specific project
 
@@ -427,10 +449,9 @@ export default function Page() {
 
               <button
                 className="demo-btn-link local-workspace-btn" disabled={!cfg.local}
-                onClick={async () => {
-                  try { await f('/auth/dev');
-                  const meRes = await f('/auth/me');
-                  if (meRes.ok) setUser(await meRes.json()); } catch(e) {setStatus(e.message);}
+                onClick={() => {
+                  setWorkspacePathInput(user?.host_path || '');
+                  setShowWorkspaceModal(true);
                 }}
                 style={{ textAlign: 'left', padding: '12px 14px' }}
               >
@@ -444,11 +465,11 @@ export default function Page() {
                     <span>Open Local Machine Workspace</span>
                   </div>
                   <span style={{ fontSize: 10, background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)', padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}>
-                    HOST SYNC
+                    CHOOSE DIRECTORY
                   </span>
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.35, fontFamily: 'var(--font-mono, monospace)', wordBreak: 'break-all' }}>
-                  Direct host filesystem: backend/workspaces/local/
+                  Pick where circuit files are saved on your computer (Mac / Windows / Linux)
                 </div>
               </button>
             </div>
@@ -563,13 +584,132 @@ export default function Page() {
             </div>
           </div>
         )}
+
+        {/* Modal: Local Workspace Directory on Login Screen */}
+        {showWorkspaceModal && (
+          <div className="modal-backdrop" onMouseDown={() => setShowWorkspaceModal(false)}>
+            <div className="modal" style={{ width: 480 }} onMouseDown={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--accent)' }}>
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                  </svg>
+                  <h2 style={{ margin: 0, fontSize: 16 }}>Local Workspace Directory</h2>
+                </div>
+                <button onClick={() => setShowWorkspaceModal(false)} style={{ color: 'var(--muted)', cursor: 'pointer', padding: 4, background: 'none', border: 'none' }}>✕</button>
+              </div>
+
+              <p style={{ color: 'var(--muted)', fontSize: 12, lineHeight: 1.5, marginBottom: 14 }}>
+                Specify where circuit files and projects are stored on your machine. Suitable for macOS, Windows, and Linux.
+              </p>
+
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                const customPath = workspacePathInput.trim();
+                try {
+                  await f('/auth/dev', { method: 'POST', body: JSON.stringify({ path: customPath }) });
+                  const meRes = await f('/auth/me');
+                  if (meRes.ok) {
+                    const meData = await meRes.json();
+                    setUser(meData);
+                    setStatus(`Active workspace: ${meData.host_path}`);
+                  }
+                  setShowWorkspaceModal(false);
+                } catch (err) {
+                  setStatus(`Workspace setup failed: ${err.message}`);
+                }
+              }}>
+                <div style={{ marginBottom: 14 }}>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (window.showDirectoryPicker) {
+                        try {
+                          const dirHandle = await window.showDirectoryPicker({ id: 'decad-circuits', mode: 'readwrite' });
+                          if (dirHandle && dirHandle.name) {
+                            setWorkspacePathInput(dirHandle.name);
+                          }
+                        } catch (err) {
+                          if (err.name !== 'AbortError') setStatus(err.message);
+                        }
+                      } else {
+                        document.getElementById('native-login-folder-input')?.click();
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      background: 'var(--panel2)',
+                      border: '1.5px dashed var(--accent)',
+                      borderRadius: 8,
+                      color: '#fff',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--accent)' }}>
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <span>Browse Finder / File Explorer to Select Folder...</span>
+                  </button>
+                  <input
+                    id="native-login-folder-input"
+                    type="file"
+                    webkitdirectory="true"
+                    directory="true"
+                    style={{ display: 'none' }}
+                    onChange={e => {
+                      const files = e.target.files;
+                      if (files && files.length > 0) {
+                        const pathParts = files[0].webkitRelativePath?.split('/');
+                        const folder = pathParts && pathParts.length > 1 ? pathParts[0] : files[0].name;
+                        setWorkspacePathInput(folder);
+                      }
+                    }}
+                  />
+                </div>
+
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#cbd5e1', marginBottom: 6 }}>
+                  Or enter/confirm folder path:
+                </label>
+                <input
+                  type="text"
+                  value={workspacePathInput}
+                  placeholder="e.g. /Users/name/Documents/Circuits or C:\Users\name\Circuits"
+                  onChange={e => setWorkspacePathInput(e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 6, color: '#fff', fontSize: 12, fontFamily: 'var(--font-mono, monospace)', marginBottom: 8 }}
+                />
+
+                <div style={{ background: 'var(--panel)', padding: '10px 12px', borderRadius: 6, border: '1px solid var(--line)', marginBottom: 16, fontSize: 11, color: 'var(--muted)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={{ fontWeight: 600, color: 'var(--text)' }}>Platform folder examples:</span>
+                  <div>• <strong>macOS:</strong> <code>/Users/{user?.login || 'name'}/Documents/Circuits</code></div>
+                  <div>• <strong>Windows:</strong> <code>C:\Users\name\Documents\Circuits</code></div>
+                  <div>• <strong>Linux:</strong> <code>/home/name/circuits</code></div>
+                </div>
+
+                <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                  <button type="button" className="btn-secondary" onClick={() => setShowWorkspaceModal(false)}>Cancel</button>
+                  <button type="submit" className="btn-primary" style={{ background: 'var(--green)' }}>Launch Workspace</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
   // LOGGED-IN WORKBENCH VIEW
   return (
-    <div className={`app ${theme}`}>
+    <div className={`app theme-forge experience-${experience} ${assistantExpanded?'assistant-expanded':''}`}>
+      <input ref={fileInputRef} type="file" multiple accept=".txt,.pdf,.docx,.png,.jpg,.jpeg,.webp,.json,.csv,.cir,.spice,.net,.kicad_sch" hidden onChange={handleFileUpload}/>
+
       {/* 1. TOP NAVBAR */}
       <header className="top-navbar">
         <div className="brand-section">
@@ -584,32 +724,7 @@ export default function Page() {
           <span className="rev-tag">rev {activeRevisionHash}</span>
         </div>
 
-        {/* 10 UI DESIGN STYLES SELECTOR (Removed search bar as requested) */}
-        <div style={{ margin: '0 auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div className="theme-pill-selector">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 0 0 20v-20z"/>
-            </svg>
-            <span style={{ color: 'var(--muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>Theme:</span>
-            <select
-              className="theme-select-dropdown"
-              value={theme}
-              onChange={(e) => setTheme(e.target.value)}
-              title="Select one of 10 UI styles"
-            >
-              <option value="theme-forge">Forge (Industrial Dark)</option>
-              <option value="theme-nebula">Nebula (Deep Violet)</option>
-              <option value="theme-phosphor">Phosphor (CRT Matrix)</option>
-              <option value="theme-neon">Neon (Electric Cyber)</option>
-              <option value="theme-daylight">Daylight (Clean Light)</option>
-              <option value="theme-cyberpunk">Cyberpunk (Yellow & Cyan)</option>
-              <option value="theme-monokai">Monokai (Hacker Pro)</option>
-              <option value="theme-obsidian">Obsidian (OLED Black)</option>
-              <option value="theme-blueprint">Blueprint (Engineering)</option>
-              <option value="theme-solarized">Solarized (Warm Slate)</option>
-            </select>
-          </div>
-        </div>
+        <ExperiencePicker value={experience} onChange={changeExperience}/>
 
         <div className="top-right-actions">
           <div className="engine-status-indicators">
@@ -748,10 +863,12 @@ export default function Page() {
         </div>
       </header>
 
-      {/* 2. WORKBENCH 3-COLUMN BODY */}
-      <div className="workbench-grid">
+      <ExperienceMenu experience={experience} onNew={openNewProjectDialog} onSave={()=>kicadControl('save')} onUndo={()=>kicadControl('undo')} onRedo={()=>kicadControl('redo')} onCheck={()=>{setTab('checks');refresh();}} onImport={()=>fileInputRef.current?.click()} onExport={async()=>{if(!pid)return;try{setBoardGraph(await (await f(`/projects/${pid}/graph`)).json());}catch(e){setStatus(e.message);}}} onTab={setTab} onAssistant={()=>{if(experience==='canvas')setAssistantExpanded(v=>!v);else assistantInputRef.current?.focus();}} onOpen={()=>{if(pid)setOpenFileDialog('');else setStatus('Select a project before opening a file.');}} onRun={()=>loadSimulation()} onVerify={()=>{if(pid)setShowVerification(true);}} onInspect={async()=>{if(!pid)return;try{setInspectCurrent(true);setProposal(await(await f(`/projects/${pid}/graph`)).json());}catch(e){setStatus(e.message);}}} projects={projects} project={pid} onProject={value=>{if(sourceDirty)setStatus('Save or discard source edits first.');else setPid(value);}}/>
+      {/* 2. WORKBENCH BODY */}
+      {experience==='classic'?<ClassicDesktop project={pid} projects={projects} files={diskFiles} components={componentsList} nets={netsList} checks={checksList} revision={rev} status={status} api={API} onExperience={changeExperience} onProject={value=>{if(sourceDirty)setStatus('Save or discard source edits first.');else setPid(value);}} onNew={openNewProjectDialog} onOpen={setOpenFileDialog} onVerify={()=>setShowVerification(true)} onImport={()=>fileInputRef.current?.click()} onNative={openNative} onExport={async()=>{if(!pid)return;try{setBoardGraph(await(await f(`/projects/${pid}/graph`)).json());}catch(e){setStatus(e.message);}}} onCheck={async()=>{try{await f(`/projects/${pid}/validate`);await refresh();setStatus('Native electrical rules check completed.');}catch(e){setStatus(e.message);}}} onCommand={sendPrompt} onProposal={planWithModel} onUndo={()=>kicadControl('undo')} onRedo={()=>kicadControl('redo')} onSave={saveSource} source={sourceCode} onSource={value=>{setSourceCode(value);setSourceDirty(true);}} sourceDirty={sourceDirty} onDiscard={()=>setSourceDirty(false)} onDocument={setTab} document={['schematic','source','bom','nets'].includes(tab)?tab:'schematic'} onSelect={setSelectedComponent} selected={selectedComponent} busy={busy||uploading} onInspect={async()=>{if(!pid)return;try{setInspectCurrent(true);setProposal(await(await f(`/projects/${pid}/graph`)).json());}catch(e){setStatus(e.message);}}}/>:<div className="workbench-grid">
         {/* LEFT COLUMN: PROJECTS, REVISION FILES, LIBRARIES */}
         <aside className="left-nav-sidebar">
+          <ApplicationLauncher project={pid} request={f} onStatus={setStatus} onSelect={setOutputTool} />
           <div className="sidebar-header-row">
             <span>Projects</span>
             <button className="sidebar-add-btn" onClick={openNewProjectDialog} title="New project">
@@ -764,17 +881,23 @@ export default function Page() {
           <div style={{ padding: '6px 10px 10px 10px', borderBottom: '1px solid var(--line)', marginBottom: 8, background: 'rgba(255,255,255,0.02)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
               <span style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>Local Host Storage</span>
-              <span style={{ fontSize: 9, background: 'rgba(34,197,94,0.15)', color: '#22c55e', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>
-                PERSISTED
-              </span>
+              <button 
+                onClick={() => {
+                  setWorkspacePathInput(user?.host_path || '');
+                  setShowWorkspaceModal(true);
+                }}
+                style={{ fontSize: 9, background: 'rgba(34,197,94,0.15)', color: '#22c55e', padding: '1px 5px', borderRadius: 3, fontWeight: 700, cursor: 'pointer' }}
+                title="Change local directory"
+              >
+                CHANGE ✎
+              </button>
             </div>
             <div 
-              style={{ fontSize: 10.5, color: 'var(--text)', fontFamily: 'var(--font-mono, monospace)', background: 'var(--panel2)', padding: '4px 6px', borderRadius: 4, border: '1px solid var(--line)', wordBreak: 'break-all', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}
-              title="Click to copy host filesystem folder path"
+              style={{ fontSize: 10.5, color: 'var(--text)', fontFamily: 'var(--font-mono, monospace)', background: 'var(--panel2)', padding: '4px 6px', borderRadius: 4, border: '1px solid var(--line)', wordBreak: 'break-all', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4, cursor: 'pointer' }}
+              title="Click to change or copy host filesystem folder path"
               onClick={() => {
-                const pth = user?.host_path ? `${user.host_path}/${pid || ''}` : `backend/workspaces/local/${pid || ''}`;
-                navigator.clipboard?.writeText(pth);
-                setStatus(`Copied host path: ${pth}`);
+                setWorkspacePathInput(user?.host_path || '');
+                setShowWorkspaceModal(true);
               }}
             >
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -802,6 +925,7 @@ export default function Page() {
             ))}
           </div>
 
+          <ProjectHierarchy components={componentsList} nets={netsList} selected={selectedComponent} onSelect={ref=>{setSelectedComponent(ref);if(experience==='canvas')setAssistantExpanded(true);}} onNet={name=>{setStatus(`Net ${name}: ${netsList.find(n=>n.name===name)?.nodes.map(p=>`${p.ref}.${p.pin}`).join(', ')}`);setTab('nets');}}/>
           <div className="sidebar-subheading">
             <span>Revision Files</span>
             <span className="count-tag">{diskFiles.length}</span>
@@ -810,7 +934,7 @@ export default function Page() {
           {/* Group 1: KICAD FILES */}
           <div className="file-group-label">KICAD</div>
           {diskFiles.filter(f => f.name.includes('.kicad_')).map(f => (
-            <div key={f.name} className={`file-row ${selectedFile === f.name ? 'active' : ''}`} onClick={() => {if(sourceDirty)setStatus('Save or discard source edits before changing files.');else {setSelectedFile(f.name);setTab('source');}}}>
+            <div key={f.name} className={`file-row ${selectedFile === f.name ? 'active' : ''}`} onClick={() => {if(sourceDirty)setStatus('Save or discard source edits before changing files.');else {setOpenFileDialog(f.name);}}}>
               <span className="file-name-with-icon">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--accent)' }}>
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6"/>
@@ -821,27 +945,17 @@ export default function Page() {
             </div>
           ))}
 
-          {/* Group 2: ROUTING / SPECTRA DSN */}
-          <div className="file-group-label">ROUTING / SPECTRA DSN</div>
+          {/* Group 2: ROUTING / SPECCTRA DSN */}
+          <div className="file-group-label">ROUTING / SPECCTRA DSN</div>
           <div
             className="file-row"
             title="KiCad Specctra DSN autorouter file - click to download"
             onClick={async () => {
-              if (!pid) return;
-              try {
-                setStatus('Exporting KiCad Specctra DSN...');
-                const r = await f(`/projects/${pid}/export/specctra-dsn`);
-                if (r.ok) {
-                  const blob = await r.blob();
-                  triggerDownload(blob, `${pid}.dsn`, 'text/plain');
-                  setStatus(`Downloaded ${pid}.dsn (KiCad Specctra format)`);
-                } else {
-                  const err = await r.json().catch(() => ({ detail: 'Export error' }));
-                  setStatus(err.detail || 'Failed to export DSN');
-                }
-              } catch (e) {
-                setStatus(`DSN export failed: ${e.message}`);
+              if (!pid) {
+                setStatus('Select a project first to export DSN');
+                return;
               }
+              try{setDsnOnly(true);setBoardGraph(await (await f(`/projects/${pid}/graph`)).json());}catch(e){setStatus(e.message);}
             }}
           >
             <span className="file-name-with-icon">
@@ -909,17 +1023,8 @@ export default function Page() {
             </svg>
             <span>Import circuit source (File/Text)</span>
           </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept=".txt,.pdf,.docx,.png,.jpg,.jpeg,.webp,.json,.csv,.cir,.spice,.net"
-            style={{ display: 'none' }}
-            onChange={handleFileUpload}
-          />
-
           {/* Option 2: Place exact KiCad symbol - Places cursor in assistant */}
-          <button className="library-action-btn" title="Place exact KiCad symbol & place cursor in assistant" onClick={() => focusAssistant('Place exact KiCad symbol with part number: ')}>
+          <button className="library-action-btn" title="Place exact KiCad symbol & place cursor in assistant" onClick={() => {if(pid)setCircuitTool('place');else setStatus('Select a project first.');}}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
             </svg>
@@ -1115,9 +1220,11 @@ export default function Page() {
           {/* REAL KICAD EMBEDDED ENGINE (Live interactive components) */}
           {tab==='integrations'&&<IntegrationsPanel project={pid} request={f} download={downloadServer} onStatus={setStatus} onSimulate={engine=>{setTab('scope');loadSimulation(engine);}}/>}
           {tab === 'schematic' && (
-            <div className="kicad-embed-wrapper">
-              {pid ? (editorMode==='embedded'&&health?.embedded ? <iframe title="Native KiCad editor" src={KICAD_URL} style={{width:'100%',height:'100%',border:0}}/> : <div className="schematic-preview-scroll"><img alt={`${pid} generated schematic`} src={`${API}/projects/${pid}/preview.svg?v=${rev}`} style={{width:`${previewZoom*100}%`}} onError={()=>setStatus('Schematic preview could not load. Check the project and retry.')} /></div>) : <div style={{padding:40}}>Create or select a project to open its schematic.</div>}
-            </div>
+            <div className="schematic-workspace">
+              {experience==='review'&&<SourcePane project={pid} files={diskFiles} api={API} onImport={()=>fileInputRef.current?.click()}/>}
+              <div className="kicad-embed-wrapper">
+              {pid ? (editorMode==='embedded'&&health?.embedded ? <iframe title="Native KiCad editor" src={KICAD_URL} style={{width:'100%',height:'100%',border:0}}/> : <SchematicViewport api={API} project={pid} revision={rev} zoom={previewZoom} onZoom={setPreviewZoom} selected={selectedComponent} grid={canvasGrid}/>) : <div style={{padding:40}}>Create or select a project to open its schematic.</div>}
+            </div></div>
           )}
 
           {/* Option: Source Tab */}
@@ -1378,10 +1485,14 @@ export default function Page() {
               </div>
             </div>
           )}
+          {experience==='lab'&&<LabInstrument data={simData} error={simError} busy={busy} onRun={()=>loadSimulation('ngspice')}/>}
+          <WorkspaceDock checks={checksList} status={status} nets={netsList} components={componentsList} validation={projectData?.validation} experience={experience} onSelect={setSelectedComponent} onTab={setTab}/>
         </section>
 
         {/* RIGHT COLUMN: ASSISTANT WITH REAL-TIME MCP EXECUTION */}
         <aside className="right-assistant-sidebar">
+          {['classic','canvas'].includes(experience)&&<PropertyInspector component={componentsList.find(c=>c.ref===selectedComponent)} nets={netsList} onEdit={text=>{setAssistantExpanded(true);focusAssistant(text);}}/>}
+          {experience==='review'&&<ReviewChecklist parts={componentsList.length} nets={netsList.length} onReview={async()=>{if(!pid)return;try{setInspectCurrent(true);setProposal(await (await f(`/projects/${pid}/graph`)).json());}catch(e){setStatus(e.message);}}}/>}
           <div className="assistant-header-bar">
             <div className="assistant-title-row">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1389,60 +1500,40 @@ export default function Page() {
               </svg>
               <span>ASSISTANT</span><button className="signin-btn-compact" onClick={commitLocal}>Commit</button><button className="signin-btn-compact" onClick={()=>kicadControl("undo")}>Undo</button><button className="signin-btn-compact" onClick={()=>kicadControl("redo")}>Redo</button>
             </div>
+            <ApplicationLauncher compact project={pid} request={f} onStatus={setStatus} onSelect={setOutputTool} />
+            <button className="review-entry" disabled={!pid||busy} onClick={async()=>{try{const graph=await (await f(`/projects/${pid}/graph`)).json();setInspectCurrent(true);setProposal(graph);setProposalSource(null);}catch(e){setStatus(e.message);}}}>Review components and connections</button>
+            <details className="recognition-config"><summary>Import and output settings</summary>
             <label className="recognition-choice">Output software
               <select aria-label="Output software" value={outputTool} disabled={busy||uploading} onChange={e=>setOutputTool(e.target.value)}>
                 <option value="kicad">KiCad — editable schematic</option><option value="ngspice">ngspice — simulation netlist</option><option value="ltspice">LTspice — simulation netlist</option><option value="qucs-s">Qucs-S — schematic and circuit library</option>
               </select><small>Successful generation downloads a project for this application.</small>
             </label>
-            <label className="recognition-choice">Image/PDF recognition
+            <label className="recognition-choice">Image / PDF schematic import mode
               <select aria-label="Image recognition mode" value={recognitionMode} onChange={e=>setRecognitionMode(e.target.value)}>
-                <option value="circuit">CPU components and wire connections</option>
-                <option value="ocr">Labels only</option>
-                <option value="vision">Vision: components and connections</option>
+                <option value="vision">Detailed vision — full schematic</option>
+                <option value="circuit">Geometric recognition — simple clean circuits</option>
+                <option value="ocr">Label OCR — components only</option>
               </select>
-              <small>{recognitionMode==='vision'?'Requires a configured vision server; review extracted wiring.':recognitionMode==='circuit'?'No model required; clean R/C/V diagrams. Review every connection.':'Label text only; add connections during review.'}</small>
+              <small style={{ color: '#8b949e', lineHeight: 1.4, marginTop: 4 }}>
+                {recognitionMode==='vision'
+                  ? 'Reads the overview and high-resolution details with the configured vision model. Review every component and physical pin before applying.'
+                  : recognitionMode==='circuit'
+                  ? 'Fast, offline detection using computer vision algorithms (OpenCV contours) for clean diagrams with resistors, capacitors, and diodes.'
+                  : 'Reads part numbers, component values, and labels from your drawing or datasheet using OCR text recognition.'}
+              </small>
             </label>
+            </details>
             <div className="model-selector-pill" title="Native KiCad operations">
               <span className="dot-green" />
               <span>{editorMode==='embedded'?'Native KiCad editor':'Generated schematic preview'}</span>
             </div>
           </div>
 
-          {/* Native KiCad Status Tracker Strip */}
-          <div style={{ padding: '6px 12px', background: 'var(--panel2)', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
-            <span title="Stage 1: Intent & Dialog Responder" style={{ color: 'var(--accent)' }}>① Answer</span>
-            <span title="Stage 2: Circuit & Document Entity Extractor" style={{ color: '#58a6ff' }}>② Parse</span>
-            <span title="Stage 3: Sanity, Rule & ERC Checker" style={{ color: '#d29922' }}>③ Check</span>
-            <span title="Stage 4: Apply the layout to the KiCad editor" style={{ color: '#3fb950' }}>④ Layout</span>
-          </div>
+          <SynthesisStatus request={f} onConfigure={()=>setTab('integrations')}/>
+          <div className="assistant-phase-strip">Source → Proposal → Review → Native validation</div>
 
           <div className="assistant-chat-stream">
-            <div className="assistant-welcome-card">
-              <div className="welcome-cf-subtitle">DECAD · CIRCUIT OPERATIONS</div>
-              <div className="welcome-main-headline">What are we building?</div>
-              <div className="welcome-explainer">
-                Use explicit commands or import a circuit. Edits are checked by native KiCad ERC.
-              </div>
-
-              <div className="assistant-syntax-cheatsheet">
-                <div className="cheat-row" style={{ cursor: 'pointer' }} onClick={() => focusAssistant('describe ')}>
-                  <span className="cheat-keyword">describe</span>
-                  <span className="cheat-desc">a circuit in plain words (component and circuit details)</span>
-                </div>
-                <div className="cheat-row" style={{ cursor: 'pointer' }} onClick={() => focusAssistant('R1 = 4.7k')}>
-                  <span className="cheat-keyword">R1 = 4.7k</span>
-                  <span className="cheat-desc">change a value, works offline</span>
-                </div>
-                <div className="cheat-row" style={{ cursor: 'pointer' }} onClick={() => focusAssistant('add capacitor C1 100nF and resistor R1 10k')}>
-                  <span className="cheat-keyword">add C1 / R1</span>
-                  <span className="cheat-desc">synthesize live in middle KiCad</span>
-                </div>
-                <div className="cheat-row" style={{ cursor: 'pointer' }} onClick={() => focusAssistant('connect net GND to R1 pin 2')}>
-                  <span className="cheat-keyword">net GND</span>
-                  <span className="cheat-desc">create electrical net rails in KiCad</span>
-                </div>
-              </div>
-            </div>
+            {!msgs.length&&<div className="assistant-empty"><span>DESIGN ASSISTANT</span><h3>{experience==='review'?'Verify before applying':'Describe the circuit'}</h3><p>Import a source or specify components, values and connections. Complex requests produce a full circuit proposal for review.</p><button onClick={()=>focusAssistant('Create a voltage divider')}>Create a voltage divider</button><button onClick={()=>fileInputRef.current?.click()}>Import circuit source…</button></div>}
 
             {/* Conversation stream */}
             {msgs.map((m, i) => (
@@ -1493,12 +1584,12 @@ export default function Page() {
                 {m.proposal && (
                   <div style={{ marginTop: 8 }}>
                     <button className="signin-btn-compact" onClick={() => { setProposal(m.proposal); setProposalSource(m.attachments?.length ? { name: m.attachments[0], path: `/projects/${pid}/file?name=${encodeURIComponent('references/' + m.attachments[0])}` } : null); }}>
-                      Open Circuit Inspector ({m.proposal.components?.length || 0} parts)
+                      Review extracted circuit ({m.proposal.components?.length || 0} parts)
                     </button>
                   </div>
                 )}
                 
-                {m.route && <div className="route-badge">route: {m.route}</div>}
+                
                 {m.output?.ready && (
                   <button className="signin-btn-compact" onClick={() => downloadServer(m.output.url, m.output.filename)}>
                     Download {m.output.tool} design
@@ -1563,7 +1654,7 @@ export default function Page() {
 
                   
 
-                  <button className="signin-btn-compact" disabled={busy || uploading || !pid || !input.trim()} onClick={planWithModel}>Plan with model</button>
+                  <button className="signin-btn-compact" disabled={busy || uploading || !pid || !input.trim()} onClick={planWithModel}>Propose circuit</button>
                   <button className="send-arrow-btn" disabled={busy || uploading || !pid} onClick={() => sendPrompt()} title="Send command">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
                   </button>
@@ -1576,7 +1667,8 @@ export default function Page() {
             </div>
           </div>
         </aside>
-      </div>
+        {experience==='canvas'&&<><div className="canvas-tool-rail"><button title="Project explorer" onClick={()=>setTab('bom')}>▦</button><button title="Schematic" onClick={()=>setTab('schematic')}>⌖</button><button title="Find a component" onClick={()=>setCircuitTool('find')}>⌕</button><button title="Place symbol" onClick={()=>setCircuitTool('place')}>⊞</button><button title="Connect physical pins" onClick={()=>setCircuitTool('connect')}>⌁</button><button title="Electrical rules check" onClick={()=>setTab('checks')}>✓</button></div><button className="canvas-assistant-toggle" onClick={()=>setAssistantExpanded(v=>!v)}>{assistantExpanded?'Close assistant':'Open assistant'}</button></>}
+      </div>}
 
       {/* 3. BOTTOM FOOTER BAR */}
       <footer className="bottom-status-strip">
@@ -1587,14 +1679,17 @@ export default function Page() {
 
         <div className="status-right-warnings">
           <span>Status: {status}</span>
-          <span>ERC: {checksList.length}</span>
+          <button className="erc-status" onClick={()=>setTab('checks')} title="Open electrical rules review">ERC: {checksList.length} — Review</button>
         </div>
       </footer>
 
-      {proposal && <CircuitReview initial={proposal} source={proposalSource} request={f} onApply={applyProposal} onClose={()=>setProposal(null)} busy={busy}/>}
-      {boardGraph && <BoardExport graph={boardGraph} request={f} onClose={()=>setBoardGraph(null)} onExport={async plan=>{
-        const r=await f(`/projects/${pid}/export/specctra`,{method:'POST',body:JSON.stringify(plan)});
-        triggerDownload(await r.blob(),`${pid}-specctra.zip`,'application/zip');setStatus('Downloaded Specctra DSN and editable PCB. Open the PCB to review placement and DRC.');
+      {circuitTool&&pid&&<CircuitTools kind={circuitTool} components={componentsList} onClose={()=>setCircuitTool(null)} onSelect={ref=>{setSelectedComponent(ref);setTab('schematic');}} onExecute={async message=>{const result=await(await f('/ai/chat',{method:'POST',body:JSON.stringify({project:pid,message})})).json();await refresh();setRev(r=>r+1);setStatus(result.reply||'Circuit command completed.');}}/>}
+      {showVerification&&pid&&<VerificationReport project={pid} request={f} onClose={()=>setShowVerification(false)}/>}
+      {openFileDialog!==null&&pid&&<OpenFileDialog project={pid} files={diskFiles} initial={openFileDialog} request={f} onClose={()=>setOpenFileDialog(null)} onStatus={setStatus} onRefresh={refresh}/>}
+      {proposal && <CircuitReview inspection={inspectCurrent} initial={proposal} source={proposalSource} request={f} onApply={applyProposal} onClose={()=>{setProposal(null);setInspectCurrent(false);}} busy={busy}/>}
+      {boardGraph && <BoardExport graph={boardGraph} request={f} onClose={()=>{setBoardGraph(null);setDsnOnly(false);}} onExport={async plan=>{
+        const r=await f(`/projects/${pid}/export/specctra?dsn_only=${dsnOnly}`,{method:'POST',body:JSON.stringify(plan)});
+        triggerDownload(await r.blob(),dsnOnly?`${pid}.dsn`:`${pid}-specctra.zip`,dsnOnly?'text/plain':'application/zip');setStatus('Downloaded Specctra DSN and editable PCB. Open the PCB to review placement and DRC.');
       }}/>}
 
       {/* Modal: Link User's Personal GitHub Account */}
@@ -1750,6 +1845,124 @@ export default function Page() {
               <button type="submit" className="btn-primary" disabled={dlg.busy || !dlg.name.trim()}>Create</button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* LOCAL WORKSPACE DIRECTORY MODAL */}
+      {showWorkspaceModal && (
+        <div className="modal-backdrop" onMouseDown={() => setShowWorkspaceModal(false)}>
+          <div className="modal" style={{ width: 480 }} onMouseDown={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--accent)' }}>
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                </svg>
+                <h2 style={{ margin: 0, fontSize: 16 }}>Local Workspace Directory</h2>
+              </div>
+              <button onClick={() => setShowWorkspaceModal(false)} style={{ color: 'var(--muted)', cursor: 'pointer', padding: 4 }}>✕</button>
+            </div>
+
+            <p style={{ color: 'var(--muted)', fontSize: 12, lineHeight: 1.5, marginBottom: 14 }}>
+              Specify the folder on your computer where your projects, schematics (<code style={{ color: 'var(--accent)' }}>.kicad_sch</code>), and routing files (<code style={{ color: '#3fb950' }}>.dsn</code>) are stored.
+            </p>
+
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const customPath = workspacePathInput.trim();
+              try {
+                await f('/auth/dev', { method: 'POST', body: JSON.stringify({ path: customPath }) });
+                const meRes = await f('/auth/me');
+                if (meRes.ok) {
+                  const meData = await meRes.json();
+                  setUser(meData);
+                  setStatus(`Active workspace: ${meData.host_path}`);
+                }
+                setShowWorkspaceModal(false);
+                await loadProjects();
+              } catch (err) {
+                setStatus(`Workspace update failed: ${err.message}`);
+              }
+            }}>
+              <div style={{ marginBottom: 14 }}>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (window.showDirectoryPicker) {
+                      try {
+                        const dirHandle = await window.showDirectoryPicker({ id: 'decad-circuits', mode: 'readwrite' });
+                        if (dirHandle && dirHandle.name) {
+                          setWorkspacePathInput(dirHandle.name);
+                        }
+                      } catch (err) {
+                        if (err.name !== 'AbortError') setStatus(err.message);
+                      }
+                    } else {
+                      document.getElementById('native-workbench-folder-input')?.click();
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    background: 'var(--panel2)',
+                    border: '1.5px dashed var(--accent)',
+                    borderRadius: 8,
+                    color: '#fff',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    transition: 'all 0.15s'
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--accent)' }}>
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                  </svg>
+                  <span>Browse Finder / File Explorer to Select Folder...</span>
+                </button>
+                <input
+                  id="native-workbench-folder-input"
+                  type="file"
+                  webkitdirectory="true"
+                  directory="true"
+                  style={{ display: 'none' }}
+                  onChange={e => {
+                    const files = e.target.files;
+                    if (files && files.length > 0) {
+                      const pathParts = files[0].webkitRelativePath?.split('/');
+                      const folder = pathParts && pathParts.length > 1 ? pathParts[0] : files[0].name;
+                      setWorkspacePathInput(folder);
+                    }
+                  }}
+                />
+              </div>
+
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#cbd5e1', marginBottom: 6 }}>
+                Or enter/confirm folder path:
+              </label>
+              <input
+                type="text"
+                value={workspacePathInput}
+                placeholder="e.g. /Users/yourname/Documents/Circuits or C:\Users\name\Circuits"
+                onChange={e => setWorkspacePathInput(e.target.value)}
+                style={{ width: '100%', padding: '9px 12px', background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 6, color: '#fff', fontSize: 12, fontFamily: 'var(--font-mono, monospace)', marginBottom: 8 }}
+              />
+
+              <div style={{ background: 'var(--panel)', padding: '10px 12px', borderRadius: 6, border: '1px solid var(--line)', marginBottom: 16, fontSize: 11, color: 'var(--muted)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontWeight: 600, color: 'var(--text)' }}>Platform folder examples:</span>
+                <div>• <strong>macOS:</strong> <code>/Users/{user?.login || 'name'}/Documents/Circuits</code></div>
+                <div>• <strong>Windows:</strong> <code>C:\Users\name\Documents\Circuits</code></div>
+                <div>• <strong>Linux:</strong> <code>/home/name/circuits</code></div>
+              </div>
+
+              <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button type="button" className="btn-secondary" onClick={() => setShowWorkspaceModal(false)}>Cancel</button>
+                <button type="submit" className="btn-primary" style={{ background: 'var(--green)' }}>Set Workspace</button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

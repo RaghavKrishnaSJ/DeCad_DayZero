@@ -1,5 +1,5 @@
 """CPU symbol geometry + OCR association + raster wire topology for schematics.
-Supports discrete passive circuits (R, C, V) as well as complex multi-IC digital systems.
+Supports clean labeled R/C/V diagrams. Complex devices require detailed vision.
 """
 import csv, io, os, re, shutil, sqlite3, subprocess, tempfile
 from pathlib import Path
@@ -126,161 +126,120 @@ def extract(path):
         raise OperationError('Circuit recognition requires Tesseract.')
     cv2.setNumThreads(1)
     image = prepare(path, max_dim=2400)
+    if max(image.size)<800:
+        factor=800/max(image.size)
+        image=image.resize((round(image.width*factor),round(image.height*factor)),Image.Resampling.LANCZOS)
     with tempfile.TemporaryDirectory() as td:
         p = Path(td) / 'image.png'
         image.save(p)
         r = subprocess.run(['tesseract', str(p), 'stdout', '--psm', '11', 'tsv'], capture_output=True, text=True, timeout=60)
         tsv_output = r.stdout if r.returncode == 0 else ''
-    ocr_list = words(tsv_output) if tsv_output else []
+        ocr_list=words(tsv_output) if tsv_output else []
+        if max(image.size)<=1400:
+            enlarged=Path(td)/'detail.png';image.resize((image.width*2,image.height*2),Image.Resampling.LANCZOS).save(enlarged)
+            detail=subprocess.run(['tesseract',str(enlarged),'stdout','--psm','11','tsv'],capture_output=True,text=True,timeout=60)
+            if detail.returncode==0:
+                for word in words(detail.stdout):
+                    ocr_list.append({**word,**{key:round(word[key]/2) for key in ('x','y','w','h')}})
     return recover(image, ocr_list)
 
 def clean_token(val: str, max_l: int = 50) -> str:
     cleaned = re.sub(r'[\r\n\t]', ' ', val).strip()
-    return cleaned[:max_l] if cleaned else '10k'
+    return cleaned[:max_l] if cleaned else 'UNKNOWN'
 
 def recover(image, ocr):
-    gray = np.array(image.convert('L'))
-    binary = (gray < 160).astype('uint8') * 255
-    cleaned = binary.copy()
-    warnings = []
-
+    """Recover clean R/C/V diagrams; never invent unidentified devices or wires."""
+    gray=np.array(image.convert('L'));binary=(gray<200).astype('uint8')*255;cleaned=binary.copy()
+    refs=[];net_words=[]
     for word in ocr:
-        if re.search('[A-Za-z0-9]', word['text']):
-            x, y, w, h = [word[k] for k in ['x', 'y', 'w', 'h']]
-            cleaned[max(0, y-2):y+h+2, max(0, x-2):x+w+2] = 0
-
-    symbols = bodies(cleaned)
-    components = []
-    assigned = []
-    used = set()
-    
-    # 1. Search for ICs and active parts
-    ic_words = [w for w in ocr if re.search(r'\b(?:U\d+|IC\d+|74[A-Z0-9]+|TC\d+|KM\d+|CY\d+)\b', w['text'], re.I) and w.get('conf', 0) >= 20]
-    u_idx = 1
-    for w in ic_words:
-        txt = clean_token(w['text'].upper(), 30)
-        if re.fullmatch(r'U\d+', txt):
-            ref = txt
-            val = '74LS244'
+        raw=word['text'];normalized=re.sub(r'(?<=[RCV])[lI]$', '1',raw.upper())
+        if re.fullmatch(r'[RCV]\d+',normalized) and word['conf']>=25:
+            refs.append((normalized,word));mask=True
+        elif re.fullmatch(r'[UJQDL]\d+',normalized) or re.fullmatch(r'(?:74[A-Z0-9]+|LM\d+[A-Z]*|NE\d+[A-Z]*)',normalized):
+            raise OperationError('Geometric recognition cannot verify active-device pinouts. Select detailed vision or import a native netlist.')
+        elif re.fullmatch(r'[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[fpnumkKMG])?(?:[FHVΩ]|ohms?)?',raw) and word['h']>=5 and word['w']/word['h']<10:mask=True
         else:
-            ref = f"U{u_idx}"
-            val = txt
-            u_idx += 1
-        lib = resolve_symbol_in_db(val) or ('74xx:' + val if '74' in val else 'Device:Integrated_Circuit')
-        if not any(c.ref == ref for c in components):
-            components.append(Component(ref=ref, value=val, library=lib))
-            warnings.append(f"Identified digital IC {ref} ({val}) mapped to {lib}.")
-
-    # 2. Search for passive references (R, C, V, D, L, Q)
-    refs = []
-    for word in ocr:
-        text = word['text']
-        normalized = re.sub(r'(?<=[RCV])[lI]$', '1', text)
-        if re.fullmatch(r'[RCVDLQ]\d+', normalized, re.I) and word['conf'] >= 25:
-            normalized = normalized.upper()
-            if not any(r == normalized for r, _ in refs) and not any(c.ref == normalized for c in components):
-                refs.append((normalized, word))
-
-    for ref, word in refs:
-        kind = ref[0]
-        possible = [(i, b) for i, b in enumerate(symbols) if i not in used and b['kind'] in [kind, 'R', 'C', 'V', 'U']]
-        b = None
-        if possible:
-            i, b = min(possible, key=lambda pair: np.hypot(pair[1]['x'] + pair[1]['w']/2 - word['x'] - word['w']/2, pair[1]['y'] + pair[1]['h']/2 - word['y'] - word['h']/2))
-            used.add(i)
-        
-        values = [v for v in ocr if v is not word and re.fullmatch(r'[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[fpnumkKMG])?(?:[FHVΩ]|ohms?)?', v['text']) and abs(v['y'] - word['y']) < max(100, word['h']*4) and abs(v['x'] - word['x']) < 260]
-        raw_val = min(values, key=lambda v: np.hypot(v['x'] - word['x'], v['y'] - word['y']))['text'] if values else ('10k' if kind == 'R' else '100nF' if kind == 'C' else '5V' if kind == 'V' else '1N4148' if kind == 'D' else 'Part')
-        val = clean_token(raw_val, 30)
-        lib = {'R': 'Device:R', 'C': 'Device:C', 'V': 'Simulation_SPICE:VDC', 'D': 'Device:D', 'L': 'Device:L', 'Q': 'Device:Q_NPN_BCE'}.get(kind, 'Device:R')
-        components.append(Component(ref=ref, value=val, library=lib))
-        if b:
-            assigned.append((ref, b))
-
-    # 3. If geometric extraction or low text found in complex schematic, detect blocks directly
-    if len(components) < 4:
-        block_candidates = [b for b in symbols if b['kind'] in ['U', 'R', 'V']]
-        if not block_candidates:
-            h_k = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 1))
-            v_k = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 25))
-            lines_mask = cv2.add(cv2.morphologyEx(binary, cv2.MORPH_OPEN, h_k), cv2.morphologyEx(binary, cv2.MORPH_OPEN, v_k))
-            cnts, _ = cv2.findContours(lines_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-            for c in cnts:
-                x, y, w, h = cv2.boundingRect(c)
-                if 25 <= w <= 400 and 20 <= h <= 350 and w * h >= 600:
-                    block_candidates.append(dict(kind='U', x=x, y=y, w=w, h=h))
-
-        for i, b in enumerate(block_candidates[:32]):
-            ref = f"U{i+1}"
-            if not any(c.ref == ref for c in components):
-                val = f"74LS{240 + (i%8)*4}"
-                lib = resolve_symbol_in_db(val) or '74xx:74LS244'
-                components.append(Component(ref=ref, value=val, library=lib))
-                assigned.append((ref, b))
-
-    if not components:
-        components.append(Component(ref='U1', value='74LS244', library='74xx:74LS244'))
-
-    # Build wire network & net connections
-    wire = cleaned | cv2.morphologyEx(binary, cv2.MORPH_OPEN, np.ones((40, 1), np.uint8)) | cv2.morphologyEx(binary, cv2.MORPH_OPEN, np.ones((1, 40), np.uint8))
-    pins = []
-    for ref, b in assigned:
-        x, y, w, h = [b[k] for k in ['x', 'y', 'w', 'h']]
-        wire[max(0, y-3):y+h+3, max(0, x-3):x+w+3] = 0
-        if b.get('kind') == 'U':
-            pin_count = min(16, max(4, h // 12))
-            for p_i in range(pin_count):
-                py = y + int((p_i + 0.5) * (h / pin_count))
-                pins.append((ref, str(p_i + 1), (x - 5, py)))
-                pins.append((ref, str(pin_count * 2 - p_i), (x + w + 5, py)))
-        else:
-            vertical = b.get('vertical', h > w)
-            points = [(x + w//2, y - 5), (x + w//2, y + h + 5)] if vertical else [(x - 5, y + h//2), (x + w + 5, y + h//2)]
-            pins.extend((ref, str(i+1), pt) for i, pt in enumerate(points))
-
-    # Segment wire tracks
-    num_nets, labels, stats, _ = cv2.connectedComponentsWithStats(wire, 8)
-    nets_dict = {}
-    for ref, pin, (px, py) in pins:
-        region = labels[max(0, py-10):py+11, max(0, px-10):px+11]
-        ids = [int(idx) for idx in np.unique(region) if idx and stats[idx, cv2.CC_STAT_AREA] > 15]
-        if ids:
-            nets_dict.setdefault(ids[0], []).append(Node(ref=ref, pin=pin))
-
-    named_nets = {}
-    for w in ocr:
-        txt = clean_token(w['text'].upper(), 20)
-        if txt in ['GND', 'VCC', 'VDD', 'VSS', 'CLK', 'RESET', 'DATA', 'ADDR', 'EN', 'CS', 'WE', 'OE']:
-            cx, cy = w['x'] + w['w']//2, w['y'] + w['h']//2
-            dists = []
-            for net_id in nets_dict:
-                ys, xs = np.where(labels == net_id)
-                if len(xs) > 0:
-                    dists.append((float(np.min((xs - cx)**2 + (ys - cy)**2)), net_id))
-            if dists:
-                best_d, best_id = min(dists)
-                if best_d < 150**2 and best_id not in named_nets:
-                    named_nets[best_id] = txt
-
-    nets = []
-    assigned_pins = set()
-    for i, (net_id, nodes) in enumerate(nets_dict.items()):
-        valid_nodes = []
-        for n in nodes:
-            k = (n.ref, n.pin)
-            if k not in assigned_pins:
-                assigned_pins.add(k)
-                valid_nodes.append(n)
-        if len(valid_nodes) >= 1:
-            name = clean_token(named_nets.get(net_id, f"NET_{i+1}"), 30)
-            nets.append(Net(name=name, nodes=valid_nodes))
-
-    if not nets and len(components) > 1:
-        for i in range(len(components) - 1):
-            nets.append(Net(name=f"BUS_{i+1}", nodes=[
-                Node(ref=components[i].ref, pin='1'),
-                Node(ref=components[i+1].ref, pin='2')
-            ]))
-
-    warnings.append('Complex multi-IC circuit topology extracted. Pin-to-net connectivity requires review before final netlist sync.')
-    return Circuit(components=components, nets=nets, warnings=warnings)
+            # Tesseract can include a junction/leader before a net label.
+            first=re.search(r'[A-Za-z]',raw);token=raw[first.start():].upper() if first else ''
+            mask=token in ('VIN','VOUT','GND','VCC','VDD','VSS','OUT','IN')
+            if mask:
+                shift=round(word['w']*first.start()/len(raw))
+                word={**word,'x':word['x']+shift,'w':word['w']-shift,'text':token};net_words.append(word)
+        if mask:
+            x,y,w,h=[word[k] for k in ('x','y','w','h')]
+            cleaned[max(0,y-2):y+h+2,max(0,x-2):x+w+2]=0
+    symbols=bodies(cleaned);components=[];assigned=[];used=set()
+    for ref,word in refs:
+        if ref in {c.ref for c in components}:continue
+        kind=ref[0];candidates=[(i,b) for i,b in enumerate(symbols) if i not in used and b['kind']==kind]
+        if not candidates:raise OperationError(f'{ref}: could not associate a symbol with its reference/value. Use detailed vision or a clearer scan.')
+        i,body=min(candidates,key=lambda pair:np.hypot(pair[1]['x']+pair[1]['w']/2-word['x'],pair[1]['y']+pair[1]['h']/2-word['y']))
+        distance=np.hypot(body['x']+body['w']/2-word['x'],body['y']+body['h']/2-word['y'])
+        if distance>max(260,image.width*.24):raise OperationError(f'{ref}: ambiguous reference/value association.')
+        used.add(i)
+        candidates=[v for v in ocr if v['h']>=5 and v['w']/v['h']<10 and re.fullmatch(r'[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[fpnumkKMG])?(?:[FHVΩ]|ohms?)?',v['text']) and abs(v['x']-word['x'])<max(50,word['w']*3) and 0<v['y']-word['y']<max(90,word['h']*5)]
+        if not candidates:
+            # Re-read the actual value pixels with a numeric alphabet. This
+            # handles OCR glyph confusions such as 5/S without guessing values.
+            from PIL import ImageOps
+            nearby=[v for v in ocr if v['h']>=5 and abs(v['x']-word['x'])<max(50,word['w']*3) and 0<v['y']-word['y']<max(90,word['h']*5)]
+            for v in nearby:
+                crop=image.crop((max(0,v['x']-2),max(0,v['y']-2),v['x']+v['w']+2,v['y']+v['h']+2))
+                crop=ImageOps.expand(crop.resize((crop.width*3,crop.height*3)),border=15,fill='white')
+                with tempfile.TemporaryDirectory() as td:
+                    target=Path(td)/'value.png';crop.save(target)
+                    result=subprocess.run(['tesseract',str(target),'stdout','--psm','7','-c','tessedit_char_whitelist=0123456789.fpnumkKMGFHV+-'],capture_output=True,text=True,timeout=15)
+                token=result.stdout.strip()
+                if re.fullmatch(r'[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[fpnumkKMG])?(?:[FHV])?',token):candidates.append({**v,'text':token})
+        if not candidates:raise OperationError(f'{ref}: unreadable reference/value. Correct the source or use detailed vision; a default value will not be substituted.')
+        value=min(candidates,key=lambda v:np.hypot(v['x']-word['x'],v['y']-word['y']))['text']
+        components.append(Component(ref=ref,value=value,library={'R':'Device:R','C':'Device:C','V':'Simulation_SPICE:VDC'}[kind]));assigned.append((ref,body))
+    if not components:raise OperationError('No reliable reference/value pairs were recovered. Use detailed vision or supply a circuit netlist.')
+    # Reject clearly visible unassigned passive symbols, rather than omit them.
+    for i,b in enumerate(symbols):
+        if i in used:continue
+        if b['kind']=='U':raise OperationError('Unidentified active-device body. Use detailed vision to verify the complete component inventory and pinout.')
+        if b['kind'] not in ('R','C','V'):continue
+        if not b.get('closed') and not(b['kind']=='C' and b['w']>35 and b['h']>20):continue
+        if any(a['x']-12<=b['x']+b['w']/2<=a['x']+a['w']+12 and a['y']-12<=b['y']+b['h']/2<=a['y']+a['h']+12 for _,a in assigned):continue
+        raise OperationError('A visible component has no readable reference/value. Review the source with detailed vision.')
+    wire=cleaned.copy();pins=[]
+    for ref,b in assigned:
+        x,y,w,h=[b[k] for k in ('x','y','w','h')]
+        wire[max(0,y-3):y+h+3,max(0,x-3):x+w+3]=0
+        vertical=b.get('vertical',h>w)
+        # Voltage source circles have equal dimensions; default upright polarity.
+        if ref.startswith('V'):vertical=True
+        pts=[(x+w//2,y-6),(x+w//2,y+h+6)] if vertical else [(x-6,y+h//2),(x+w+6,y+h//2)]
+        pins.extend((ref,str(i+1),pt) for i,pt in enumerate(pts))
+    # Four-way crossings without a dot cannot be assigned electrical semantics.
+    horizontal=cv2.morphologyEx(wire,cv2.MORPH_OPEN,np.ones((1,19),np.uint8))
+    vertical=cv2.morphologyEx(wire,cv2.MORPH_OPEN,np.ones((19,1),np.uint8))
+    count,cross_labels,stats,centers=cv2.connectedComponentsWithStats(horizontal&vertical,8)
+    for cx,cy in centers[1:]:
+        x,y=int(round(cx)),int(round(cy));radius=9
+        if x<radius or y<radius or x+radius>=image.width or y+radius>=image.height:continue
+        if all((horizontal[y-1:y+2,x-radius:x-radius+2].any(),horizontal[y-1:y+2,x+radius-1:x+radius+1].any(),vertical[y-radius:y-radius+2,x-1:x+2].any(),vertical[y+radius-1:y+radius+1,x-1:x+2].any())):
+            if np.count_nonzero(wire[y-4:y+5,x-4:x+5])<50:raise OperationError('Unmarked wire crossing is ambiguous. Add a junction dot or use detailed vision.')
+    _,labels,stats,_=cv2.connectedComponentsWithStats(wire,8);groups={}
+    for ref,pin,(px,py) in pins:
+        options=[]
+        for y in range(max(0,py-10),min(image.height,py+11)):
+            for x in range(max(0,px-10),min(image.width,px+11)):
+                label=int(labels[y,x])
+                if label and stats[label,cv2.CC_STAT_AREA]>15:options.append(((x-px)**2+(y-py)**2,label))
+        if not options:raise OperationError(f'{ref} pin {pin}: unresolved connection. Review the source before generating a circuit.')
+        label=min(options)[1];groups.setdefault(label,[]).append(Node(ref=ref,pin=pin))
+    names={}
+    for word in net_words:
+        cx,cy=word['x']+word['w']/2,word['y']+word['h']/2;distances=[]
+        for label in groups:
+            ys,xs=np.where(labels==label)
+            distances.append((float(np.min((xs-cx)**2+(ys-cy)**2)),label))
+        if distances:
+            distance,label=min(distances)
+            if distance<150**2:names[label]=word['text']
+    merged={}
+    for i,(label,nodes) in enumerate(groups.items(),1):merged.setdefault(names.get(label,f'NET_{i}'),[]).extend(nodes)
+    nets=[Net(name=name,nodes=nodes) for name,nodes in merged.items()]
+    return Circuit(components=components,nets=nets,warnings=['Geometric recovery supports clean, labeled R/C/V diagrams only. Verify all values, source polarity and wire junctions against the original.'])
