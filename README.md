@@ -20,7 +20,7 @@
 <p align="center">
   <img src="evidence/experiences/experiences_showcase.gif" alt="DeCad Multi-Experience Animated Showcase" width="100%" style="border-radius: 8px; border: 1px solid #30363d; box-shadow: 0 16px 36px rgba(0,0,0,0.6);" />
   <br/>
-  <em>⚡ Dynamic Multi-Workspace Paradigm: Classic EDA · Studio IDE · Canvas · Review Desk · Simulation Lab</em>
+  <em>Dynamic Multi-Workspace Paradigm: Classic EDA · Studio IDE · Canvas · Review Desk · Simulation Lab</em>
 </p>
 
 ---
@@ -79,7 +79,7 @@ flowchart TD
 ```
 
 ---
-## 🎨 Five Distinct Engineering Workspaces (Zero Cookie-Cutter Layouts)
+## Five Distinct Engineering Workspaces (Zero Cookie-Cutter Layouts)
 
 Unlike standard software tools that simply toggle CSS color variables, **DeCad re-architects the layout, tool rails, diagnostics docks, and interaction models for each engineering phase**:
 
@@ -144,7 +144,7 @@ Unlike standard software tools that simply toggle CSS color variables, **DeCad r
 
 ---
 
-## ⚡ Universal Application Mapping & File Dispatch
+## Universal Application Mapping & File Dispatch
 
 DeCad features an automated file association engine that inspects uploaded attachments or workspace files, automatically recommending the native EDA desktop application while allowing full engineer override:
 
@@ -163,59 +163,14 @@ graph LR
 * **Direct Original Launch**: Launch the exact file in its dedicated native host application via the Desktop Bridge.
 * **Intelligent Circuit Handoff**: Synthesize and translate current project schematics to any external tool on the fly.
 
----
-
-
----
-
-## 🖼️ Screenshots
-
-<table>
-  <tr>
-    <td width="50%"><img src="docs/screenshots/workbench.jpg" alt="Workbench with a 74LS244 bus board"><br><sub><b>Workbench</b> — explorer, live KiCad sheet with title block, assistant with the 4-stage pipeline.</sub></td>
-    <td width="50%"><img src="docs/screenshots/assistant.jpg" alt="Assistant reply"><br><sub><b>Assistant</b> — a plain-English edit, verified against KiCad's netlist; every stage reports what it did.</sub></td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshots/bom.jpg" alt="Bill of materials"><br><sub><b>BOM</b> — references, footprints, LCSC parts, indicative pricing, one-click supplier search.</sub></td>
-    <td><img src="docs/screenshots/scope.jpg" alt="Waveform scope"><br><sub><b>Waveform Scope</b> — ngspice transient run on a phosphor oscilloscope.</sub></td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshots/nets.jpg" alt="Nets"><br><sub><b>Nets</b> — the actual pin connections from KiCad's XML netlist.</sub></td>
-    <td><img src="docs/screenshots/checks.jpg" alt="ERC checks"><br><sub><b>Checks</b> — KiCad Electrical Rules Check, errors and warnings.</sub></td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshots/source.jpg" alt="Source editor"><br><sub><b>Source</b> — edit the exact <code>.kicad_sch</code> S-expression, highlighted; KiCad re-parses on save.</sub></td>
-    <td><img src="docs/screenshots/history.jpg" alt="Revision history"><br><sub><b>History</b> — every change is a Git revision.</sub></td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshots/palette.jpg" alt="Command palette"><br><sub><b>Command palette</b> (<kbd>Ctrl</kbd> <kbd>K</kbd>) — every action, export, project and theme.</sub></td>
-    <td><img src="docs/screenshots/board-export.jpg" alt="PCB and Specctra export"><br><sub><b>PCB + Specctra DSN</b> — real footprints, pad checks, placement, routing rules.</sub></td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshots/apps.jpg" alt="Applications and models"><br><sub><b>Applications &amp; models</b> — KiCad, ngspice, LTspice and Qucs-S bundles; local model status.</sub></td>
-    <td><img src="docs/screenshots/theme-menu.jpg" alt="Theme menu"><br><sub><b>10 themes</b>, switched with a circular reveal from the click.</sub></td>
-  </tr>
-</table>
-
-<div align="center">
-<img src="docs/screenshots/themes.jpg" alt="All ten themes: Forge, Nebula, Phosphor, Neon, Daylight, Cyberpunk, Monokai, Obsidian, Blueprint, Solarized" width="100%">
-<sub>Forge · Nebula · Phosphor · Neon · Daylight · Cyberpunk · Monokai · Obsidian · Blueprint · Solarized</sub>
-</div>
-
----
-
-
----
-
-## 📚 Contents
+## Contents
 
 - [The Paradigm: "Cursor for Circuits"](#the-paradigm-cursor-for-circuits)
 - [Architectural Overview](#architectural-overview)
-- [Five Distinct Engineering Workspaces](#-five-distinct-engineering-workspaces-zero-cookie-cutter-layouts)
-- [Universal Application Mapping & File Dispatch](#-universal-application-mapping--file-dispatch)
-- [Visual Screenshots & Interface Gallery](#%EF%B8%8F-screenshots)
-- [Quick start (60 seconds)](#-quick-start-60-seconds)
-- [Zero to complete guide](#-zero-to-complete-guide)
+- [Five Distinct Engineering Workspaces](#five-distinct-engineering-workspaces-zero-cookie-cutter-layouts)
+- [Universal Application Mapping & File Dispatch](#universal-application-mapping--file-dispatch)
+- [Quick start (60 seconds)](#quick-start-60-seconds)
+- [Zero to complete guide](#zero-to-complete-guide)
   - [1. Install the prerequisites](#1-install-the-prerequisites)
   - [2. Get the code](#2-get-the-code)
   - [3. Configure (optional)](#3-configure-optional)
@@ -228,30 +183,30 @@ graph LR
   - [10. Export and make a PCB](#10-export-and-make-a-pcb)
   - [11. Commit and push to GitHub](#11-commit-and-push-to-github)
   - [12. Stop, update, uninstall](#12-stop-update-uninstall)
-- [The workbench](#-the-workbench)
-- [Keyboard shortcuts](#-keyboard-shortcuts)
-- [Assistant command reference](#-assistant-command-reference)
-- [Import formats](#-import-formats)
-- [Export formats](#-export-formats)
-- [PCB, Specctra DSN and Freerouting](#-pcb-specctra-dsn-and-freerouting)
-- [Simulation](#-simulation)
-- [Desktop applications and the bridge](#-desktop-applications-and-the-bridge)
-- [GitHub integration](#-github-integration)
-- [Local AI and the vision adapter](#-local-ai-and-the-vision-adapter)
-- [Configuration reference](#-configuration-reference)
-- [Architecture](#-architecture)
-- [HTTP API reference](#-http-api-reference)
-- [Development](#-development)
-- [Testing and CI](#-testing-and-ci)
-- [Troubleshooting & FAQ](#-troubleshooting--faq)
-- [Security model](#-security-model)
-- [Scope and limitations](#-scope-and-limitations)
-- [Credits, third-party software and license](#-credits-third-party-software-and-license)
+- [The workbench](#the-workbench)
+- [Keyboard shortcuts](#keyboard-shortcuts)
+- [Assistant command reference](#assistant-command-reference)
+- [Import formats](#import-formats)
+- [Export formats](#export-formats)
+- [PCB, Specctra DSN and Freerouting](#pcb-specctra-dsn-and-freerouting)
+- [Simulation](#simulation)
+- [Desktop applications and the bridge](#desktop-applications-and-the-bridge)
+- [GitHub integration](#github-integration)
+- [Local AI and the vision adapter](#local-ai-and-the-vision-adapter)
+- [Configuration reference](#configuration-reference)
+- [Architecture](#architecture)
+- [HTTP API reference](#http-api-reference)
+- [Development](#development)
+- [Testing and CI](#testing-and-ci)
+- [Troubleshooting & FAQ](#troubleshooting--faq)
+- [Security model](#security-model)
+- [Scope and limitations](#scope-and-limitations)
+- [Credits, third-party software and license](#credits-third-party-software-and-license)
 
 ---
 
 
-## 🚀 Quick start (60 seconds)
+## Quick start (60 seconds)
 
 > **You need:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) running (Compose v2.24+, ~4–6 GB RAM and 2 CPUs allocated) and [Git](https://git-scm.com/downloads).
 
@@ -272,7 +227,7 @@ Then open **http://localhost:3100** → **Open Local Machine Workspace** → typ
 
 ---
 
-## 🧭 Zero to complete guide
+## Zero to complete guide
 
 This walks through everything, from an empty machine to a verified, simulated, routed, version-controlled circuit.
 
@@ -329,7 +284,7 @@ GITHUB_CLIENT_SECRET=
 HOST_PROJECTS_DIR=
 ```
 
-For backend-only settings, copy `backend/.env.example` to `backend/.env`. Every variable is listed in the [configuration reference](#-configuration-reference).
+For backend-only settings, copy `backend/.env.example` to `backend/.env`. Every variable is listed in the [configuration reference](#configuration-reference).
 
 ### 4. Launch
 
@@ -394,7 +349,7 @@ On first entry the workbench plays a short boot check and opens your first proje
 
 ### 7. Import a schematic photo, PDF or netlist
 
-- Click **Import circuit source** in the Explorer, the 📎 in the composer, or **drag files onto the canvas or the assistant**.
+- Click **Import circuit source** in the Explorer, the in the composer, or **drag files onto the canvas or the assistant**.
 - Choose **Image/PDF recognition**: *CPU components and wire connections* (default, no model), *Labels only* (OCR), or *Vision* (requires a vision server).
 - DeCad recognises components and connections and opens the **Circuit Review** dialog: the source image beside an editable table of components, symbols and pin-to-net connections. Fix anything, tick **"I checked…"** and **Apply reviewed circuit**.
 
@@ -414,7 +369,7 @@ Open **Waveform Scope**, set *Step* and *Stop* in SPICE units (e.g. `10u`, `10m`
 
 - **Download** (tab bar) offers the formats for the current tab; the command palette lists every export.
 - For a board: **Nets → Download → PCB autorouter Specctra DSN**. Pick an installed footprint for each part (pads are checked against the pins you use), set board size, track width, clearance and placement, tick the confirmation, and download a ZIP with `board.kicad_pcb`, `board.dsn` and a verification report.
-- Route it in Freerouting, import the `.ses` back into KiCad, run DRC. See [PCB, Specctra DSN and Freerouting](#-pcb-specctra-dsn-and-freerouting).
+- Route it in Freerouting, import the `.ses` back into KiCad, run DRC. See [PCB, Specctra DSN and Freerouting](#pcb-specctra-dsn-and-freerouting).
 
 ### 11. Commit and push to GitHub
 
@@ -433,7 +388,7 @@ Your projects stay in `backend/workspaces/` until you delete that folder.
 
 ---
 
-## 🖥️ The workbench
+## The workbench
 
 ```
 ┌ Title bar ─ logo · project / rev · ⌘K search · engine LEDs · theme · account · View Repo · Git Push ┐
@@ -462,11 +417,11 @@ Your projects stay in `backend/workspaces/` until you delete that folder.
 
 ### Themes
 
-Forge (copper on solder mask, default) · Nebula · Phosphor · Neon · Daylight · Cyberpunk · Monokai · Obsidian · Blueprint · Solarized. Pick one from the 🎨 button, the status bar or <kbd>Ctrl</kbd> <kbd>K</kbd> → "Theme". The choice is remembered per browser. All motion respects the OS *reduce motion* setting.
+Forge (copper on solder mask, default) · Nebula · Phosphor · Neon · Daylight · Cyberpunk · Monokai · Obsidian · Blueprint · Solarized. Pick one from the button, the status bar or <kbd>Ctrl</kbd> <kbd>K</kbd> → "Theme". The choice is remembered per browser. All motion respects the OS *reduce motion* setting.
 
 ---
 
-## ⌨️ Keyboard shortcuts
+## Keyboard shortcuts
 
 | Keys | Action |
 |---|---|
@@ -483,7 +438,7 @@ Forge (copper on solder mask, default) · Nebula · Phosphor · Neon · Daylight
 
 ---
 
-## 💬 Assistant command reference
+## Assistant command reference
 
 Commands are deterministic and work **offline**; free-form descriptions use the optional local model and always come back as a reviewable proposal.
 
@@ -506,7 +461,7 @@ Duplicate references and unknown pinouts are **rejected**, never silently substi
 
 ---
 
-## 📥 Import formats
+## Import formats
 
 | Input | Extensions | Result |
 |---|---|---|
@@ -528,7 +483,7 @@ Save legacy `.doc` files as `.docx`. Unreadable or unsupported inputs produce a 
 
 ---
 
-## 📤 Export formats
+## Export formats
 
 | From | Format | Notes |
 |---|---|---|
@@ -543,7 +498,7 @@ Save legacy `.doc` files as `.docx`. Unreadable or unsupported inputs produce a 
 
 ---
 
-## 🧩 PCB, Specctra DSN and Freerouting
+## PCB, Specctra DSN and Freerouting
 
 Specctra `.dsn` is an **autorouter input** (not OrCAD Capture's schematic DSN). DeCad generates it through KiCad's native `pcbnew.ExportSpecctraDSN`.
 
@@ -566,7 +521,7 @@ API users can `POST /projects/{project}/export/specctra` with a plan like [`exam
 
 ---
 
-## 📈 Simulation
+## Simulation
 
 - **ngspice** (bundled in Docker) runs transient analysis from the schematic. Set step/stop with SPICE units (`1u`, `5m`); runs are limited to 20,000 time steps.
 - **Qucs-S 26.1.1** (built in the image) runs from **Apps → Run Qucs-S here**.
@@ -576,22 +531,22 @@ API users can `POST /projects/{project}/export/specctra` with a plan like [`exam
 
 ---
 
-## 🧰 Desktop applications and the bridge
+## Desktop applications and the bridge
 
 **Apps** builds a portable bundle for each tool from the circuit's verified pin graph:
 
 | App | Bundle | Runs in the workbench |
 |---|---|---|
-| KiCad | native schematic / project | ✅ (embedded editor) |
-| ngspice | SPICE netlist | ✅ |
-| Qucs-S | native schematic + SPICE subcircuit wrapper | ✅ |
+| KiCad | native schematic / project | (embedded editor) |
+| ngspice | SPICE netlist | |
+| Qucs-S | native schematic + SPICE subcircuit wrapper | |
 | LTspice | SPICE netlist | — (install separately) |
 
 **Open in …** uses the **desktop bridge** (`bridge/desktop_bridge.py`), started by the launcher when Python 3.11+ is available. It has no network listener and only opens registered application artifacts. Point it at non-standard installs with `S2SDN_KICAD_PATH`, `S2SDN_LTSPICE_PATH`, `S2SDN_QUCS_S_PATH`, `S2SDN_NGSPICE_PATH`. Bundles download fine without the bridge.
 
 ---
 
-## 🐙 GitHub integration
+## GitHub integration
 
 **Option A — Personal Access Token (zero setup).** Click *Sign in with GitHub*. With no OAuth app configured you'll be asked for a token: [create one with the `repo` scope](https://github.com/settings/tokens/new?scopes=repo&description=DeCad), paste it, and DeCad verifies it with the GitHub API.
 
@@ -610,7 +565,7 @@ Pushing creates `<login>/s2sdn-<project>` if needed. OAuth state is verified; th
 
 ---
 
-## 🧠 Local AI and the vision adapter
+## Local AI and the vision adapter
 
 Everything core — editing, ERC, exports, simulation, CPU recognition — works **without any model**. Models only *propose* data; deterministic code validates and applies it after your review.
 
@@ -640,7 +595,7 @@ Everything core — editing, ERC, exports, simulation, CPU recognition — works
 
 ---
 
-## ⚙️ Configuration reference
+## Configuration reference
 
 Set these in the root `.env`, `backend/.env`, or your shell before launching.
 
@@ -678,7 +633,7 @@ Set these in the root `.env`, `backend/.env`, or your shell before launching.
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```mermaid
 flowchart LR
@@ -784,7 +739,7 @@ DeCad/
 
 ---
 
-## 🔗 HTTP API reference
+## HTTP API reference
 
 The browser talks to these through the same-origin `/api` proxy; all project routes require a session (local login or GitHub). Base URL: `http://localhost:8100`.
 
@@ -831,7 +786,7 @@ curl http://localhost:8100/health
 
 ---
 
-## 🛠️ Development
+## Development
 
 Run the services natively for fast iteration (Python 3.12+, KiCad CLI 9+, Node 22+):
 
@@ -854,7 +809,7 @@ Rebuild only the UI container after frontend changes: `docker compose up -d --bu
 
 ---
 
-## ✅ Testing and CI
+## Testing and CI
 
 ```bash
 # backend (needs KiCad CLI + symbol libraries)
@@ -871,7 +826,7 @@ GitHub Actions ([`validation.yml`](.github/workflows/validation.yml)) runs the d
 
 ---
 
-## 🩺 Troubleshooting & FAQ
+## Troubleshooting & FAQ
 
 <details>
 <summary><b>"Start Docker Desktop first" / the launcher exits immediately</b></summary>
@@ -935,7 +890,7 @@ Close any open KiCad dialog (automated edits wait for it), click **Preview** the
 
 ---
 
-## 🔐 Security model
+## Security model
 
 - All services bind to **127.0.0.1**. Do not expose them publicly without a proper deployment and authentication layer.
 - Model output is treated as **data**: validated against the circuit schema, installed symbol pins and requested references before it reaches KiCad.
@@ -946,7 +901,7 @@ Close any open KiCad dialog (automated edits wait for it), click **Preview** the
 
 ---
 
-## 📏 Scope and limitations
+## Scope and limitations
 
 Being honest about what is and isn't verified:
 
@@ -961,7 +916,7 @@ Being honest about what is and isn't verified:
 
 ---
 
-## 🙌 Credits, Third-Party Software and License
+## Credits, Third-Party Software and License
 
 Developed solely by **Raghav Krishna ([@JRK14](https://github.com/JRK14))**. All rights reserved.
 
@@ -980,5 +935,5 @@ DeCad stands on excellent open source engineering:
 
 <div align="center">
 <br>
-<sub>⭐ If DeCad saved you hours of manual CAD drafting, star the repository — it helps bring modern AI workflows to physical electronics engineering!</sub>
+<sub>If DeCad saved you hours of manual CAD drafting, star the repository — it helps bring modern AI workflows to physical electronics engineering!</sub>
 </div>
