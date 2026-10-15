@@ -256,8 +256,8 @@ graph LR
 > **You need:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) running (Compose v2.24+, ~4–6 GB RAM and 2 CPUs allocated) and [Git](https://git-scm.com/downloads).
 
 ```bash
-git clone https://github.com/Mithunjagan/DeCad.git
-cd DeCad
+git clone https://github.com/JRK14/DeCad_DayZero.git
+cd DeCad_DayZero
 ```
 
 | OS | Start | Stop |
@@ -302,8 +302,8 @@ In **Docker Desktop → Settings → Resources**, give Docker **at least 4 GB RA
 ### 2. Get the code
 
 ```bash
-git clone https://github.com/Mithunjagan/DeCad.git
-cd DeCad
+git clone https://github.com/JRK14/DeCad_DayZero.git
+cd DeCad_DayZero
 ```
 
 **Component libraries (optional, recommended).** The Docker image already installs the official KiCad symbol and footprint libraries. To also mount the latest official libraries plus the DigiKey, SparkFun and Seeed community libraries and Qucs-S models into `libraries/`, run:
@@ -963,7 +963,7 @@ Being honest about what is and isn't verified:
 
 ## 🙌 Credits, Third-Party Software and License
 
-Developed by **Raghav Krishna ([@JRK14](https://github.com/JRK14))** and **[@Mithunjagan](https://github.com/Mithunjagan)**.
+Developed solely by **Raghav Krishna ([@JRK14](https://github.com/JRK14))**. All rights reserved.
 
 DeCad stands on excellent open source engineering:
 - **[KiCad](https://www.kicad.org)** (GPL-3.0+) &mdash; Native schematic capture, S-expression engine, and `pcbnew` Python bindings
