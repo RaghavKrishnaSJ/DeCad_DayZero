@@ -226,11 +226,11 @@ DeCad features an automated file association engine that inspects uploaded attac
 graph LR
     File["Input File (.kicad_sch, .cir, .asc, .sch, .dsn)"] --> Detection["Format & Extension Analyzer"]
     Detection --> AutoMap{"Recommended Application"}
-    AutoMap -->|*.kicad_sch / *.kicad_pcb| App1["KiCad 9.0 Suite"]
-    AutoMap -->|*.cir / *.sp / *.net| App2["Ngspice Interactive"]
-    AutoMap -->|*.asc / *.raw| App3["LTspice Simulator"]
-    AutoMap -->|*.sch (Qucs) / *.dpl| App4["Qucs-S Universal GUI"]
-    AutoMap -->|*.dsn| App5["Freerouting Autorouter"]
+    AutoMap -->|"*.kicad_sch / *.kicad_pcb"| App1["KiCad 9.0 Suite"]
+    AutoMap -->|"*.cir / *.sp / *.net"| App2["Ngspice Interactive"]
+    AutoMap -->|"*.asc / *.raw"| App3["LTspice Simulator"]
+    AutoMap -->|"*.sch (Qucs) / *.dpl"| App4["Qucs-S Universal GUI"]
+    AutoMap -->|"*.dsn"| App5["Freerouting Autorouter"]
     Detection --> Override["Manual Engineer Selection & Format Conversion"]
 ```
 
